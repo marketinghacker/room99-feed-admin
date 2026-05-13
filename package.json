@@ -1,0 +1,12 @@
+{
+  "name": "room99-feed-admin",
+  "version": "1.0.0",
+  "description": "Mini panel do dodawania wariantów tytułów do Room99 Feed Duplicator. Deploy na Vercel.",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
