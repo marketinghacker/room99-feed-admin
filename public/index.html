@@ -112,31 +112,31 @@
 
     <form id="variant-form">
       <div class="field">
-        <label for="matchInTitle">🎯 Grupa produktów (Match w tytule)</label>
+        <label for="matchInTitle">Grupa produktów (Match w tytule)</label>
         <input type="text" id="matchInTitle" name="matchInTitle" placeholder="GARDEN LINE" required />
         <div class="hint">Skrypt znajdzie wszystkie produkty których tytuł zawiera ten string (case-insensitive)</div>
       </div>
 
       <div class="field">
-        <label for="searchInTitle">🔍 Szukaj w tytule</label>
+        <label for="searchInTitle">Szukaj w tytule</label>
         <input type="text" id="searchInTitle" name="searchInTitle" placeholder="ZASŁONA NA TARAS" required />
         <div class="hint">Tekst który zostanie zastąpiony w tytule duplikatu</div>
       </div>
 
       <div class="field">
-        <label for="replaceWith">✏️ Zastąp przez</label>
+        <label for="replaceWith">Zastąp przez</label>
         <input type="text" id="replaceWith" name="replaceWith" placeholder="ZASŁONA DO ALTANY" required />
         <div class="hint">Nowy tekst (zostanie automatycznie sformatowany Word Capitalize)</div>
       </div>
 
       <div class="field">
-        <label for="dupSuffix">🏷️ Identyfikator wariantu (krótki, unikalny)</label>
+        <label for="dupSuffix">Sufiks ID (krótki, unikalny)</label>
         <input type="text" id="dupSuffix" name="dupSuffix" placeholder="t6" required pattern="[a-z0-9]+" maxlength="10" />
         <div class="hint">Małe litery i cyfry, max 10 znaków. Pojawi się w id (np. 9491_t6) i custom_label_1</div>
       </div>
 
       <div class="field">
-        <label for="notes">📝 Notatka (opcjonalna)</label>
+        <label for="notes">Notatka (opcjonalna)</label>
         <textarea id="notes" name="notes" placeholder="Hipoteza dlaczego testujemy ten wariant..."></textarea>
       </div>
 
