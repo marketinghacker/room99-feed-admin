@@ -1,16 +1,26 @@
-# Room99 Feed Admin
+# Room99 Feed Command Center
 
-> Dokument dla **AI agentów** rozbudowujących ten projekt (Claude Code, Cursor, ChatGPT). Czytaj uważnie — zawiera business context, deployment, security i sugestie rozbudowy.
+> Dokument dla **AI agentów** rozbudowujących ten projekt (Claude Code, Cursor, ChatGPT). Czytaj uważnie — zawiera business context, deployment, security, sprint plan i sugestie rozbudowy.
+
+> **Sprint 1 (2026-05-14, in progress):** rebuild z single-form mini app do **Command Center** z 7 sekcjami (Today, Rules, Hypotheses, Images, Performance, Feed Health, History) + legacy "+ Add Variant" form. Sprint 1 = **read-only**, zero writes do production.
+
+---
+
+## ⚠️ RULE #0 — DO NOT BREAK CURRENT GENERATION (NADRZĘDNA)
+
+Output TSV `room99-feed-duplicator/output/google-pl-with-test-titles.tsv` feeduje live Google Shopping campaigns. Każda zmiana w `config.json` MUSI być additive, backwards-compatible, reversible. Pełny safety contract: zobacz `room99-feed-duplicator/README.md` + `/Users/marcinmichalski/.claude/plans/rippling-beaming-canyon.md`.
+
+Sprint 1 nie zmienia nic w production — wszystkie nowe endpointy są GET-only, legacy `/api/add-variant` POST zostaje bez zmian.
 
 ---
 
 ## 1. CEL — co ta aplikacja robi
 
-**Front-end (mobile-friendly) do dodawania nowych wariantów tytułów do feeda Room99.**
+**Single source of truth dla optymalizacji feedu Room99.pl w Google Shopping (PLA + PMax).**
 
-Marcin (project owner) zarządza eksperymentami A/B/C/D/E tytułów produktów w Google Shopping. Bez tej aplikacji musiałby ręcznie edytować `config.json` w repo `room99-feed-duplicator` na GitHub — niemożliwe z telefonu, frustrujące na desktop.
+Marcin (Marketing Hackers agency) zarządza eksperymentami A/B/C/D/E tytułów (i — wkrótce — obrazków głównych) dla 1841 produktów Room99.pl. Cel: ROAS +15%, koszty klików -70% w 3 miesiące.
 
-**Rozwiązanie:** Strona z prostym formularzem (4 pola) hostowana na Vercel. Wypełnia formularz → submit → automatycznie powstaje GitHub Issue → workflow w `room99-feed-duplicator` przetwarza issue → dodaje regułę do config.json → regeneruje feed → Google Merchant Center pobiera nowy feed.
+**Rozwiązanie:** SPA na Vercel z 7 sekcjami nawigacyjnymi (hash router, vanilla JS, zero build step). Backend = GitHub `config.json` w repo `room99-feed-duplicator` (single source of truth, audit trail via git).
 
 **Kluczowe zalety:**
 - Mobile-first (działa w iOS/Android Safari/Chrome)
@@ -287,16 +297,30 @@ Marcin chce więcej funkcji. Najprawdopodobniejsze:
 
 ---
 
-## 12. AKTUALNY STAN (2026-05-13)
+## 12. AKTUALNY STAN
 
-- ✅ Single-page admin app działa
-- ✅ Formularz dodawania wariantów funkcjonalny
-- ✅ Issues są tworzone i procesowane przez backend
-- ✅ Vercel deployed
-- ✅ Mobile-friendly
+### Sprint 1 (2026-05-14) — Read-only Command Center
+- ✅ SPA shell z 7-sekcyjnym hash routerem (Today, Rules, Hypotheses, Images, Performance, Feed Health, History) + legacy "+ Add Variant"
+- ✅ `public/index.html` — SPA HTML
+- ✅ `public/styles.css` — dark theme, command-center aesthetic
+- ✅ `public/app.js` — vanilla JS, hash router, lazy section render, fetch helpers
+- ✅ `api/config.js` — GET /api/config (reads config.json from feed-duplicator)
+- ✅ `api/feed-stats.js` — GET /api/feed-stats (output size, last cron run, last commit)
+- ✅ `api/add-variant.js` — unchanged, legacy POST endpoint still works (Issue-based flow)
+- ✅ Today section: 4 KPI tiles (active rules, duplicates count, last regeneration, last config change) + decisions feed + feed activity
+- ✅ Rules section: read-only table of all rules with status pills, edit button disabled (Sprint 2)
+- ✅ Feed Health section: cron status, output stats, last commit
+- ✅ Hypotheses/Images/Performance/History: placeholders with "Coming in Sprint X" messaging
+- ✅ Graceful degradation if API endpoints fail (error alerts in UI)
+- ✅ Zero writes to production data in Sprint 1
 
-**Co dalej:** rozszerzenie o features z sekcji 9 (Priority 1 najpierw).
+### Roadmap
+- **Sprint 2:** Rules CRUD via direct PATCH on config.json, hypothesis pipeline (GSC + Ads + GA4, no Ahrefs), pre-flight diff verification
+- **Sprint 3:** Image Manager (gallery, set-as-main, A/B variants via custom_label_1=img_a/b/c), Performance MVP
+- **Sprint 4:** "Why It Won" cards, Feed Health alerts, History timeline + rollback, polish + undo toasts
+
+Full plan: `/Users/marcinmichalski/.claude/plans/rippling-beaming-canyon.md` (also pushed to git as design doc).
 
 ---
 
-*Plik napisany 2026-05-13 przez Claude w cowork mode z Marcinem. Edycja w przyszłości — zachowuj sekcję "Lessons Learned" i "Połączone projekty".*
+*Plik utworzony 2026-05-13, rebuild 2026-05-14 (Sprint 1) przez Claude w cowork mode z Marcinem. Edycja w przyszłości — zachowuj sekcję "Lessons Learned" i "Połączone projekty".*

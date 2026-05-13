@@ -3,192 +3,198 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Room99 — Dodaj wariant tytułu</title>
-  <style>
-    :root {
-      --bg: #0a0a0f;
-      --card: #16161f;
-      --border: #2a2a3a;
-      --text: #e8e8f0;
-      --muted: #8a8aa0;
-      --primary: #4f9bf7;
-      --primary-hover: #6ab0ff;
-      --success: #4ade80;
-      --error: #f87171;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
-      max-width: 560px;
-      width: 100%;
-    }
-    h1 { font-size: 22px; margin-bottom: 8px; }
-    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
-    label {
-      display: block;
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 6px;
-      font-weight: 500;
-    }
-    .field { margin-bottom: 20px; }
-    .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    input, textarea {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 12px 14px;
-      border-radius: 8px;
-      font-size: 15px;
-      font-family: inherit;
-      transition: border-color 0.15s;
-    }
-    input:focus, textarea:focus {
-      outline: none;
-      border-color: var(--primary);
-    }
-    textarea { resize: vertical; min-height: 60px; }
-    button {
-      width: 100%;
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 14px;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    button:hover:not(:disabled) { background: var(--primary-hover); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .alert {
-      padding: 12px 16px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      display: none;
-    }
-    .alert.show { display: block; }
-    .alert.success { background: rgba(74, 222, 128, 0.1); color: var(--success); border: 1px solid rgba(74, 222, 128, 0.3); }
-    .alert.error { background: rgba(248, 113, 113, 0.1); color: var(--error); border: 1px solid rgba(248, 113, 113, 0.3); }
-    .examples {
-      background: rgba(79, 155, 247, 0.05);
-      border: 1px solid rgba(79, 155, 247, 0.2);
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 24px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-    .examples b { color: var(--text); }
-  </style>
+  <title>Room99 Feed Command Center</title>
+  <meta name="description" content="Single source of truth for Room99 Google Shopping feed optimization — titles, images, A/B tests, performance." />
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div class="card">
-    <h1>Room99 — Dodaj wariant tytułu</h1>
-    <p class="subtitle">Wypełnij formularz → automatycznie doda regułę do feedu duplikatów GMC</p>
-
-    <div class="examples">
-      <b>Aktywne grupy:</b> GARDEN LINE (72 produkty), MARSHMALLOW, BIANCA<br />
-      <b>Aktywne sufiksy:</b> t1, t2, t3, t4, t5 — nowy musi być unikalny
+  <nav class="top-nav">
+    <div class="brand">Room99 <span class="brand-accent">Command Center</span></div>
+    <div class="tabs" id="tabs">
+      <a href="#today" data-tab="today">Today</a>
+      <a href="#rules" data-tab="rules">Rules</a>
+      <a href="#hypotheses" data-tab="hypotheses">Hypotheses</a>
+      <a href="#images" data-tab="images">Images</a>
+      <a href="#performance" data-tab="performance">Performance</a>
+      <a href="#feed-health" data-tab="feed-health">Feed Health</a>
+      <a href="#history" data-tab="history">History</a>
+      <a href="#add-variant" data-tab="add-variant" class="primary">+ Add Variant</a>
     </div>
+  </nav>
 
-    <div id="alert" class="alert"></div>
-
-    <form id="variant-form">
-      <div class="field">
-        <label for="matchInTitle">Grupa produktów (Match w tytule)</label>
-        <input type="text" id="matchInTitle" name="matchInTitle" placeholder="GARDEN LINE" required />
-        <div class="hint">Skrypt znajdzie wszystkie produkty których tytuł zawiera ten string (case-insensitive)</div>
+  <main>
+    <!-- TODAY -->
+    <section id="section-today" class="section">
+      <div class="section-header">
+        <h1 class="section-title">Today</h1>
+        <div class="section-sub">Live snapshot of Room99 feed state. Read-only in Sprint 1.</div>
       </div>
-
-      <div class="field">
-        <label for="searchInTitle">Szukaj w tytule</label>
-        <input type="text" id="searchInTitle" name="searchInTitle" placeholder="ZASŁONA NA TARAS" required />
-        <div class="hint">Tekst który zostanie zastąpiony w tytule duplikatu</div>
+      <div class="kpi-strip" id="kpi-strip">
+        <div class="loading">Ładuję…</div>
       </div>
-
-      <div class="field">
-        <label for="replaceWith">Zastąp przez</label>
-        <input type="text" id="replaceWith" name="replaceWith" placeholder="ZASŁONA DO ALTANY" required />
-        <div class="hint">Nowy tekst (zostanie automatycznie sformatowany Word Capitalize)</div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Decisions to make today</div>
+            <div class="card-sub">Sprint 2 will surface auto-generated hypotheses</div>
+          </div>
+          <div id="decisions-feed">
+            <div class="loading">Ładuję sygnały…</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Feed activity</div>
+            <div class="card-sub">Last cron tick + last config change</div>
+          </div>
+          <div id="feed-activity">
+            <div class="loading">Ładuję…</div>
+          </div>
+        </div>
       </div>
+    </section>
 
-      <div class="field">
-        <label for="dupSuffix">Sufiks ID (krótki, unikalny)</label>
-        <input type="text" id="dupSuffix" name="dupSuffix" placeholder="t6" required pattern="[a-z0-9]+" maxlength="10" />
-        <div class="hint">Małe litery i cyfry, max 10 znaków. Pojawi się w id (np. 9491_t6) i custom_label_1</div>
+    <!-- RULES -->
+    <section id="section-rules" class="section">
+      <div class="section-header">
+        <h1 class="section-title">Title test rules</h1>
+        <div class="section-sub">Active duplicate rules generating Shopping variants. Sprint 2 adds toggle/edit/delete.</div>
       </div>
-
-      <div class="field">
-        <label for="notes">Notatka (opcjonalna)</label>
-        <textarea id="notes" name="notes" placeholder="Hipoteza dlaczego testujemy ten wariant..."></textarea>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="rules-count">Loading rules…</div>
+          <a class="pill pill-info mono" id="rules-source-link" target="_blank" rel="noopener">view config.json on GitHub</a>
+        </div>
+        <div id="rules-table-wrap">
+          <div class="loading">Ładuję reguły z config.json…</div>
+        </div>
       </div>
+    </section>
 
-      <button type="submit" id="submit-btn">Dodaj wariant</button>
-    </form>
-  </div>
+    <!-- HYPOTHESES -->
+    <section id="section-hypotheses" class="section">
+      <div class="section-header">
+        <h1 class="section-title">Hypotheses</h1>
+        <div class="section-sub">Auto-generated title test ideas from GSC + Google Ads + GA4.</div>
+      </div>
+      <div class="placeholder">
+        <div class="placeholder-icon">◷</div>
+        <div class="placeholder-title">Sprint 2 — Coming next</div>
+        <div class="placeholder-text">
+          4-step pipeline: GSC anonymous queries → Google Ads search terms (n-gram) → GA4 ecommerce per LP → seasonal volume.
+          Scoring: <span class="mono">(volume × CVR × CTR_gap)</span>.
+          Kanban flow: Suggested / Testing / Promoted / Rejected.
+        </div>
+      </div>
+    </section>
 
-  <script>
-    const form = document.getElementById('variant-form');
-    const btn = document.getElementById('submit-btn');
-    const alertEl = document.getElementById('alert');
+    <!-- IMAGES -->
+    <section id="section-images" class="section">
+      <div class="section-header">
+        <h1 class="section-title">Image Manager</h1>
+        <div class="section-sub">Test which existing feed image works best as PLA main image.</div>
+      </div>
+      <div class="placeholder">
+        <div class="placeholder-icon">▣</div>
+        <div class="placeholder-title">Sprint 3 — Coming after Rules engine</div>
+        <div class="placeholder-text">
+          Per-product gallery (image_link + additional_image_link[1..N]), set-as-main swap, A/B image variants (custom_label_1=img_a/b/c), GMC compliance check. <strong>No AI generation</strong>, optional Vercel Blob upload for edge cases.
+        </div>
+      </div>
+    </section>
 
-    function showAlert(msg, type) {
-      alertEl.textContent = msg;
-      alertEl.className = `alert show ${type}`;
-    }
+    <!-- PERFORMANCE -->
+    <section id="section-performance" class="section">
+      <div class="section-header">
+        <h1 class="section-title">Performance</h1>
+        <div class="section-sub">CTR, CPC, ROAS, Search Impr. Share per variant.</div>
+      </div>
+      <div class="placeholder">
+        <div class="placeholder-icon">⇲</div>
+        <div class="placeholder-title">Sprint 3 — Coming with Google Ads OAuth</div>
+        <div class="placeholder-text">
+          7 metrics per variant: Impressions, CTR, Avg CPC, CVR, ROAS, Search Impr Share, Unique search terms. Win criteria: 100 clicks + 3000 impressions + 95% CI + 14 days. Cannibalization detector.
+        </div>
+      </div>
+    </section>
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      btn.disabled = true;
-      btn.textContent = 'Dodaję...';
-      alertEl.className = 'alert';
+    <!-- FEED HEALTH -->
+    <section id="section-feed-health" class="section">
+      <div class="section-header">
+        <h1 class="section-title">Feed Health</h1>
+        <div class="section-sub">Cron status, last regeneration, output size.</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">System status</div>
+          <div class="card-sub" id="feed-health-fetched-at"></div>
+        </div>
+        <div id="feed-health-body">
+          <div class="loading">Ładuję…</div>
+        </div>
+      </div>
+    </section>
 
-      const data = {
-        matchInTitle: form.matchInTitle.value.trim(),
-        searchInTitle: form.searchInTitle.value.trim(),
-        replaceWith: form.replaceWith.value.trim(),
-        dupSuffix: form.dupSuffix.value.trim(),
-        notes: form.notes.value.trim()
-      };
+    <!-- HISTORY -->
+    <section id="section-history" class="section">
+      <div class="section-header">
+        <h1 class="section-title">History</h1>
+        <div class="section-sub">Every config.json commit on room99-feed-duplicator.</div>
+      </div>
+      <div class="placeholder">
+        <div class="placeholder-icon">⏱</div>
+        <div class="placeholder-title">Sprint 4 — Coming with diff view + rollback</div>
+        <div class="placeholder-text">
+          Timeline of changes with semantic diff (rule added/edited/deactivated). One-click revert via <span class="mono">git revert</span> API.
+          For now: <a id="history-temp-link" target="_blank" rel="noopener" class="mono">view commits on GitHub →</a>
+        </div>
+      </div>
+    </section>
 
-      try {
-        const res = await fetch('/api/add-variant', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        const json = await res.json();
+    <!-- ADD VARIANT (legacy form, still works) -->
+    <section id="section-add-variant" class="section">
+      <div class="section-header">
+        <h1 class="section-title">Add new title variant</h1>
+        <div class="section-sub">Legacy flow — creates a GitHub Issue → workflow merges to config.json → cron regenerates feed within 1h.</div>
+      </div>
+      <div class="card form-card">
+        <div id="alert" class="alert"></div>
+        <form id="variant-form">
+          <div class="field">
+            <label for="matchInTitle">Grupa produktów (Match w tytule)</label>
+            <input type="text" id="matchInTitle" name="matchInTitle" placeholder="GARDEN LINE" required />
+            <div class="hint">Skrypt znajdzie wszystkie produkty których tytuł zawiera ten string (case-insensitive)</div>
+          </div>
+          <div class="field">
+            <label for="searchInTitle">Szukaj w tytule</label>
+            <input type="text" id="searchInTitle" name="searchInTitle" placeholder="ZASŁONA NA TARAS" required />
+            <div class="hint">Tekst który zostanie zastąpiony w tytule duplikatu</div>
+          </div>
+          <div class="field">
+            <label for="replaceWith">Zastąp przez</label>
+            <input type="text" id="replaceWith" name="replaceWith" placeholder="ZASŁONA DO ALTANY" required />
+            <div class="hint">Nowy tekst (Word Capitalize stosowane automatycznie po stronie generatora)</div>
+          </div>
+          <div class="field">
+            <label for="dupSuffix">Sufiks ID (krótki, unikalny)</label>
+            <input type="text" id="dupSuffix" name="dupSuffix" placeholder="t8" required pattern="[a-z0-9]+" maxlength="10" />
+            <div class="hint">Małe litery i cyfry, max 10 znaków. Pojawi się w id (np. 9491_t8) i custom_label_1</div>
+          </div>
+          <div class="field">
+            <label for="notes">Notatka (opcjonalna)</label>
+            <textarea id="notes" name="notes" placeholder="Hipoteza dlaczego testujemy ten wariant…"></textarea>
+          </div>
+          <button type="submit" id="submit-btn" class="btn btn-block">Dodaj wariant</button>
+        </form>
+      </div>
+    </section>
+  </main>
 
-        if (res.ok) {
-          showAlert(`✓ Dodano wariant! Issue #${json.issueNumber} - feed zregeneruje się w ciągu 1h. ${json.url ? `[zobacz Issue](${json.url})` : ''}`, 'success');
-          form.reset();
-        } else {
-          showAlert(`✗ Błąd: ${json.error || 'nieznany'}`, 'error');
-        }
-      } catch (err) {
-        showAlert(`✗ Błąd sieci: ${err.message}`, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Dodaj wariant';
-      }
-    });
-  </script>
+  <footer>
+    Room99 Feed Command Center · Sprint 1 (read-only) · State in
+    <a class="mono" href="https://github.com/marketinghacker/room99-feed-duplicator/blob/main/config.json" target="_blank" rel="noopener">config.json</a>
+  </footer>
+
+  <script src="/app.js"></script>
 </body>
 </html>
