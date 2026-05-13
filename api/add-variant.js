@@ -28,24 +28,25 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Brakuje GITHUB_TOKEN lub GITHUB_OWNER w env vars Vercel' });
   }
 
-  // Build issue body w formacie który parsuje handler-workflow
-  const issueBody = `### 🎯 Grupa produktów (Match w tytule)
+  // Build issue body w formacie ktory parsuje handler-workflow
+  // UWAGA: labels MUSZA byc identyczne z dodaj-wariant.yml issue template i regex w handle-new-variant-issue.yml
+  const issueBody = `### Grupa produktow
 
 ${matchInTitle}
 
-### 🔍 Szukaj w tytule
+### Szukaj w tytule
 
 ${searchInTitle}
 
-### ✏️ Zastąp przez
+### Zastap przez
 
 ${replaceWith}
 
-### 🏷️ Identyfikator wariantu (krótki, unikalny)
+### Sufiks ID
 
 ${dupSuffix}
 
-### 📝 Notatka (opcjonalna)
+### Notatka
 
 ${notes || '_No response_'}
 `;
