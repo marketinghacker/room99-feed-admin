@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Room99 — Dodaj wariant tytułu</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --card: #16161f;
+      --border: #2a2a3a;
+      --text: #e8e8f0;
+      --muted: #8a8aa0;
+      --primary: #4f9bf7;
+      --primary-hover: #6ab0ff;
+      --success: #4ade80;
+      --error: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 560px;
+      width: 100%;
+    }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .field { margin-bottom: 20px; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    input, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    textarea { resize: vertical; min-height: 60px; }
+    button {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover:not(:disabled) { background: var(--primary-hover); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert.success { background: rgba(74, 222, 128, 0.1); color: var(--success); border: 1px solid rgba(74, 222, 128, 0.3); }
+    .alert.error { background: rgba(248, 113, 113, 0.1); color: var(--error); border: 1px solid rgba(248, 113, 113, 0.3); }
+    .examples {
+      background: rgba(79, 155, 247, 0.05);
+      border: 1px solid rgba(79, 155, 247, 0.2);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 24px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .examples b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Room99 — Dodaj wariant tytułu</h1>
+    <p class="subtitle">Wypełnij formularz → automatycznie doda regułę do feedu duplikatów GMC</p>
+
+    <div class="examples">
+      <b>Aktywne grupy:</b> GARDEN LINE (72 produkty), MARSHMALLOW, BIANCA<br />
+      <b>Aktywne sufiksy:</b> t1, t2, t3, t4, t5 — nowy musi być unikalny
+    </div>
+
+    <div id="alert" class="alert"></div>
+
+    <form id="variant-form">
+      <div class="field">
+        <label for="matchInTitle">🎯 Grupa produktów (Match w tytule)</label>
+        <input type="text" id="matchInTitle" name="matchInTitle" placeholder="GARDEN LINE" required />
+        <div class="hint">Skrypt znajdzie wszystkie produkty których tytuł zawiera ten string (case-insensitive)</div>
+      </div>
+
+      <div class="field">
+        <label for="searchInTitle">🔍 Szukaj w tytule</label>
+        <input type="text" id="searchInTitle" name="searchInTitle" placeholder="ZASŁONA NA TARAS" required />
+        <div class="hint">Tekst który zostanie zastąpiony w tytule duplikatu</div>
+      </div>
+
+      <div class="field">
+        <label for="replaceWith">✏️ Zastąp przez</label>
+        <input type="text" id="replaceWith" name="replaceWith" placeholder="ZASŁONA DO ALTANY" required />
+        <div class="hint">Nowy tekst (zostanie automatycznie sformatowany Word Capitalize)</div>
+      </div>
+
+      <div class="field">
+        <label for="dupSuffix">🏷️ Identyfikator wariantu (krótki, unikalny)</label>
+        <input type="text" id="dupSuffix" name="dupSuffix" placeholder="t6" required pattern="[a-z0-9]+" maxlength="10" />
+        <div class="hint">Małe litery i cyfry, max 10 znaków. Pojawi się w id (np. 9491_t6) i custom_label_1</div>
+      </div>
+
+      <div class="field">
+        <label for="notes">📝 Notatka (opcjonalna)</label>
+        <textarea id="notes" name="notes" placeholder="Hipoteza dlaczego testujemy ten wariant..."></textarea>
+      </div>
+
+      <button type="submit" id="submit-btn">Dodaj wariant</button>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('variant-form');
+    const btn = document.getElementById('submit-btn');
+    const alertEl = document.getElementById('alert');
+
+    function showAlert(msg, type) {
+      alertEl.textContent = msg;
+      alertEl.className = `alert show ${type}`;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      btn.textContent = 'Dodaję...';
+      alertEl.className = 'alert';
+
+      const data = {
+        matchInTitle: form.matchInTitle.value.trim(),
+        searchInTitle: form.searchInTitle.value.trim(),
+        replaceWith: form.replaceWith.value.trim(),
+        dupSuffix: form.dupSuffix.value.trim(),
+        notes: form.notes.value.trim()
+      };
+
+      try {
+        const res = await fetch('/api/add-variant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+
+        if (res.ok) {
+          showAlert(`✓ Dodano wariant! Issue #${json.issueNumber} - feed zregeneruje się w ciągu 1h. ${json.url ? `[zobacz Issue](${json.url})` : ''}`, 'success');
+          form.reset();
+        } else {
+          showAlert(`✗ Błąd: ${json.error || 'nieznany'}`, 'error');
+        }
+      } catch (err) {
+        showAlert(`✗ Błąd sieci: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Dodaj wariant';
+      }
+    });
+  </script>
+</body>
+</html>
