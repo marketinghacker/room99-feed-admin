@@ -92,14 +92,33 @@
     <section id="section-images" class="section">
       <div class="section-header">
         <h1 class="section-title">Image Manager</h1>
-        <div class="section-sub">Test which existing feed image works best as PLA main image.</div>
+        <div class="section-sub">Browse all 1841 products + their feed images. Click a product to view full gallery. Swap-as-main is preview-only in this iteration (no writes to feed yet).</div>
       </div>
-      <div class="placeholder">
-        <div class="placeholder-icon">▣</div>
-        <div class="placeholder-title">Sprint 3 — Coming after Rules engine</div>
-        <div class="placeholder-text">
-          Per-product gallery (image_link + additional_image_link[1..N]), set-as-main swap, A/B image variants (custom_label_1=img_a/b/c), GMC compliance check. <strong>No AI generation</strong>, optional Vercel Blob upload for edge cases.
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="images-count">Loading products…</div>
+          <div class="flex-gap-1">
+            <input type="search" id="images-search" placeholder="Szukaj produktu (tytuł lub id)" style="width:280px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);" />
+            <button class="btn" id="images-search-btn" style="padding:8px 14px;">Szukaj</button>
+          </div>
         </div>
+        <div id="images-grid">
+          <div class="loading">Ładuję listę produktów…</div>
+        </div>
+        <div id="images-pagination" class="flex-between" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);"></div>
+      </div>
+
+      <!-- Per-product detail modal-like card (hidden by default) -->
+      <div class="card" id="images-detail" style="margin-top:20px;display:none;">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="detail-title">—</div>
+            <div class="card-sub mono" id="detail-meta">—</div>
+          </div>
+          <button class="btn" id="detail-close" style="padding:6px 12px;background:var(--card-hover);color:var(--text);">Zamknij</button>
+        </div>
+        <div id="detail-gallery"></div>
+        <div id="detail-preview" style="margin-top:16px;"></div>
       </div>
     </section>
 
@@ -123,6 +142,16 @@
       <div class="section-header">
         <h1 class="section-title">Feed Health</h1>
         <div class="section-sub">Cron status, last regeneration, output size.</div>
+      </div>
+      <div class="card mb-2">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Manual regeneration</div>
+            <div class="card-sub">Triggers regenerate-feed.yml workflow on demand (cron continues every hour regardless).</div>
+          </div>
+          <button class="btn" id="regenerate-btn" style="padding:10px 16px;">⟳ Regenerate now</button>
+        </div>
+        <div id="regenerate-status" class="alert"></div>
       </div>
       <div class="card">
         <div class="card-header">
@@ -172,8 +201,9 @@
           </div>
           <div class="field">
             <label for="replaceWith">Zastąp przez</label>
-            <input type="text" id="replaceWith" name="replaceWith" placeholder="ZASŁONA DO ALTANY" required />
-            <div class="hint">Nowy tekst (Word Capitalize stosowane automatycznie po stronie generatora)</div>
+            <input type="text" id="replaceWith" name="replaceWith" placeholder="Zasłona do altany" required />
+            <div class="hint">Pisz jak chcesz — wynikowy tytuł produktu i tak będzie <strong>Title Case</strong> (każde słowo z dużej, bez ALL-CAPS). Live preview poniżej:</div>
+            <div id="replace-preview" class="text-dim mono" style="margin-top:6px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;min-height:28px;">—</div>
           </div>
           <div class="field">
             <label for="dupSuffix">Sufiks ID (krótki, unikalny)</label>

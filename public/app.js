@@ -1,6 +1,6 @@
-// Room99 Feed Command Center — Sprint 1 (read-only)
+// Room99 Feed Command Center — Sprint 2 (read-only with manual regenerate trigger)
 // Vanilla JS SPA: hash router, fetch helpers, section renderers.
-// Zero deps. No write actions yet — Sprint 2 adds CRUD on rules.
+// Zero deps. Write actions to config.json deferred — pre-flight diff infra first.
 
 const REPO_URL = 'https://github.com/marketinghacker/room99-feed-duplicator';
 const CONFIG_URL = REPO_URL + '/blob/main/config.json';
@@ -99,12 +99,22 @@ const RENDERERS = {
   today: renderToday,
   rules: renderRules,
   hypotheses: () => {}, // static placeholder
-  images: () => {},
-  performance: () => {},
+  images: renderImages,
+  performance: () => {}, // static placeholder
   'feed-health': renderFeedHealth,
   history: renderHistoryLink,
   'add-variant': renderAddVariant,
 };
+
+// ---------- Word Capitalize (mirror of generate-feed.js) ----------
+// Pierwsza litera każdego słowa wielka, reszta mała. Zachowuje "155x270" (x lowercase między cyframi).
+// Negative lookbehind: litera musi NIE być poprzedzona przez literę ANI cyfrę.
+function wordCapitalize(s) {
+  if (!s) return '';
+  return String(s)
+    .toLowerCase()
+    .replace(/(?<![\p{L}\d])(\p{L})(\p{L}*)/gu, (m, first, rest) => first.toUpperCase() + rest);
+}
 
 async function renderToday() {
   await ensureCoreLoaded();
@@ -268,6 +278,42 @@ async function renderRules() {
 async function renderFeedHealth() {
   await ensureCoreLoaded();
 
+  // Wire regenerate button (idempotent — bind once)
+  const regenBtn = document.getElementById('regenerate-btn');
+  const regenStatus = document.getElementById('regenerate-status');
+  if (regenBtn && regenBtn.dataset.bound !== '1') {
+    regenBtn.dataset.bound = '1';
+    regenBtn.addEventListener('click', async () => {
+      regenBtn.disabled = true;
+      regenBtn.textContent = '⟳ Trigger…';
+      regenStatus.className = 'alert';
+      try {
+        const r = await fetch('/api/regenerate-feed', { method: 'POST' });
+        const j = await r.json();
+        if (r.ok) {
+          regenStatus.className = 'alert show success';
+          regenStatus.innerHTML = `✓ ${escapeHTML(j.message)} <button class="pill pill-info" id="regen-refresh" style="margin-left:8px;border:none;cursor:pointer;">Refresh status now →</button>`;
+          document.getElementById('regen-refresh')?.addEventListener('click', async () => {
+            state.feedStats = null;
+            state.statsError = null;
+            _coreLoaded = null;
+            await ensureCoreLoaded();
+            renderFeedHealth();
+          });
+        } else {
+          regenStatus.className = 'alert show error';
+          regenStatus.textContent = 'Błąd: ' + (j.error || 'unknown');
+        }
+      } catch (e) {
+        regenStatus.className = 'alert show error';
+        regenStatus.textContent = 'Błąd sieci: ' + e.message;
+      } finally {
+        regenBtn.disabled = false;
+        regenBtn.textContent = '⟳ Regenerate now';
+      }
+    });
+  }
+
   const body = document.getElementById('feed-health-body');
   const fetchedEl = document.getElementById('feed-health-fetched-at');
 
@@ -331,6 +377,229 @@ function renderHistoryLink() {
   if (a) a.href = COMMITS_URL;
 }
 
+// ---------- IMAGES ----------
+const imagesState = {
+  page: 1,
+  perPage: 24,
+  q: '',
+  total: 0,
+  selectedProductId: null,
+};
+
+async function renderImages() {
+  const search = document.getElementById('images-search');
+  const btn = document.getElementById('images-search-btn');
+
+  function trigger() {
+    imagesState.q = search.value.trim();
+    imagesState.page = 1;
+    fetchAndRenderProductList();
+  }
+  btn.addEventListener('click', trigger);
+  search.addEventListener('keydown', (e) => { if (e.key === 'Enter') trigger(); });
+
+  document.getElementById('detail-close').addEventListener('click', () => {
+    document.getElementById('images-detail').style.display = 'none';
+    imagesState.selectedProductId = null;
+  });
+
+  fetchAndRenderProductList();
+}
+
+async function fetchAndRenderProductList() {
+  const grid = document.getElementById('images-grid');
+  const countEl = document.getElementById('images-count');
+  const pagEl = document.getElementById('images-pagination');
+
+  grid.innerHTML = '<div class="loading">Ładuję produkty z feedu (~1-3s pierwszy raz, potem cache 5 min)…</div>';
+
+  const params = new URLSearchParams({
+    page: imagesState.page,
+    perPage: imagesState.perPage,
+  });
+  if (imagesState.q) params.set('q', imagesState.q);
+
+  let data;
+  try {
+    data = await fetchJSON('/api/products?' + params);
+  } catch (e) {
+    countEl.textContent = 'Błąd ładowania';
+    grid.innerHTML = `<div class="alert error show">Nie udało się pobrać produktów: ${escapeHTML(e.message)}</div>`;
+    pagEl.innerHTML = '';
+    return;
+  }
+
+  imagesState.total = data.pagination.total;
+  countEl.textContent = `${data.pagination.total.toLocaleString('pl-PL')} produktów${
+    imagesState.q ? ` (filtr: "${imagesState.q}")` : ''
+  } · strona ${data.pagination.page}/${data.pagination.totalPages}`;
+
+  if (data.products.length === 0) {
+    grid.innerHTML = '<div class="placeholder"><div class="placeholder-title">Brak wyników</div></div>';
+    pagEl.innerHTML = '';
+    return;
+  }
+
+  grid.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
+      ${data.products
+        .map(
+          (p) => `
+        <div class="product-tile" data-id="${escapeHTML(p.id)}" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color 0.12s;">
+          <div style="aspect-ratio:1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+            <img loading="lazy" src="${escapeHTML(p.image_link)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=color:var(--muted);font-size:11px;>brak zdjęcia</span>'" />
+          </div>
+          <div style="padding:10px;">
+            <div style="font-size:12px;font-weight:600;line-height:1.3;max-height:32px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHTML(p.title)}</div>
+            <div class="mono" style="font-size:11px;color:var(--muted);margin-top:4px;">id ${escapeHTML(p.id)}</div>
+            <div style="margin-top:4px;">
+              <span class="pill pill-info">${p.total_images} ${p.total_images === 1 ? 'image' : 'images'}</span>
+              ${p.availability && p.availability.toLowerCase() !== 'in stock' ? '<span class="pill pill-muted">out of stock</span>' : ''}
+            </div>
+          </div>
+        </div>
+      `
+        )
+        .join('')}
+    </div>
+  `;
+  // Hover style + click handlers
+  grid.querySelectorAll('.product-tile').forEach((tile) => {
+    tile.addEventListener('mouseenter', () => (tile.style.borderColor = 'var(--border-strong)'));
+    tile.addEventListener('mouseleave', () => (tile.style.borderColor = 'var(--border)'));
+    tile.addEventListener('click', () => openProductDetail(tile.dataset.id));
+  });
+
+  // Pagination
+  const tp = data.pagination.totalPages;
+  const p = data.pagination.page;
+  pagEl.innerHTML = `
+    <div class="text-muted" style="font-size:12px;">
+      Łącznie ${data.pagination.total.toLocaleString('pl-PL')} produktów · pokazuję ${data.products.length}
+    </div>
+    <div class="flex-gap-1">
+      <button class="btn" id="pag-prev" ${p <= 1 ? 'disabled' : ''} style="padding:6px 12px;background:var(--card-hover);color:var(--text);">← Prev</button>
+      <span class="mono text-dim" style="padding:6px 8px;font-size:12px;">${p} / ${tp}</span>
+      <button class="btn" id="pag-next" ${p >= tp ? 'disabled' : ''} style="padding:6px 12px;background:var(--card-hover);color:var(--text);">Next →</button>
+    </div>
+  `;
+  document.getElementById('pag-prev').addEventListener('click', () => {
+    if (imagesState.page > 1) { imagesState.page--; fetchAndRenderProductList(); }
+  });
+  document.getElementById('pag-next').addEventListener('click', () => {
+    if (imagesState.page < tp) { imagesState.page++; fetchAndRenderProductList(); }
+  });
+}
+
+async function openProductDetail(productId) {
+  imagesState.selectedProductId = productId;
+  const detail = document.getElementById('images-detail');
+  detail.style.display = 'block';
+  document.getElementById('detail-title').textContent = 'Ładuję…';
+  document.getElementById('detail-meta').textContent = 'id ' + productId;
+  document.getElementById('detail-gallery').innerHTML = '<div class="loading">Ładuję galerię…</div>';
+  document.getElementById('detail-preview').innerHTML = '';
+
+  // Scroll into view
+  detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  let data;
+  try {
+    data = await fetchJSON('/api/products?id=' + encodeURIComponent(productId));
+  } catch (e) {
+    document.getElementById('detail-gallery').innerHTML =
+      `<div class="alert error show">Błąd: ${escapeHTML(e.message)}</div>`;
+    return;
+  }
+
+  const p = data.products[0];
+  if (!p) {
+    document.getElementById('detail-gallery').innerHTML =
+      '<div class="alert error show">Produkt nie znaleziony</div>';
+    return;
+  }
+
+  document.getElementById('detail-title').textContent = p.title;
+  document.getElementById('detail-meta').innerHTML =
+    `id <strong>${escapeHTML(p.id)}</strong> · ${escapeHTML(p.product_type || '—')} · ${escapeHTML(p.availability || '—')} · ${escapeHTML(p.price || '')}`;
+
+  const allImages = [p.image_link, ...p.additional_image_link].filter(Boolean);
+  const gallery = document.getElementById('detail-gallery');
+
+  gallery.innerHTML = `
+    <div class="mb-2 text-dim">${allImages.length} obrazków w feedzie — kliknij dowolny aby zobaczyć "co by się stało jako głównego image".</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">
+      ${allImages
+        .map(
+          (url, idx) => `
+        <div class="gal-tile" data-url="${escapeHTML(url)}" data-idx="${idx}" style="position:relative;cursor:pointer;border:2px solid ${idx === 0 ? 'var(--primary)' : 'var(--border)'};border-radius:8px;overflow:hidden;background:#000;aspect-ratio:1;">
+          <img loading="lazy" src="${escapeHTML(url)}" alt="" style="width:100%;height:100%;object-fit:cover;" />
+          ${idx === 0 ? '<span class="pill pill-info" style="position:absolute;top:6px;left:6px;">MAIN</span>' : `<span class="pill pill-muted" style="position:absolute;top:6px;left:6px;">#${idx + 1}</span>`}
+        </div>
+      `
+        )
+        .join('')}
+    </div>
+  `;
+
+  gallery.querySelectorAll('.gal-tile').forEach((tile) => {
+    tile.addEventListener('click', () => previewImageSwap(p, parseInt(tile.dataset.idx, 10)));
+  });
+}
+
+function previewImageSwap(product, newMainIdx) {
+  const allImages = [product.image_link, ...product.additional_image_link].filter(Boolean);
+  const newMain = allImages[newMainIdx];
+  const previewEl = document.getElementById('detail-preview');
+
+  if (newMainIdx === 0) {
+    previewEl.innerHTML = `
+      <div class="alert warning show">
+        To już jest aktualne główne zdjęcie. Wybierz inne aby zobaczyć preview swap-as-main.
+      </div>
+    `;
+    return;
+  }
+
+  previewEl.innerHTML = `
+    <div class="card" style="background:var(--bg);">
+      <div class="card-header">
+        <div class="card-title">Preview: swap-as-main</div>
+        <span class="pill pill-warning">no write yet — preview only</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 40px 1fr;gap:20px;align-items:center;">
+        <div>
+          <div class="text-muted mb-1" style="font-size:11px;">PRZED (obecne MAIN)</div>
+          <div style="aspect-ratio:1;background:#000;border-radius:8px;overflow:hidden;">
+            <img src="${escapeHTML(product.image_link)}" alt="" style="width:100%;height:100%;object-fit:contain;" />
+          </div>
+        </div>
+        <div style="text-align:center;font-size:32px;color:var(--primary);">→</div>
+        <div>
+          <div class="text-muted mb-1" style="font-size:11px;">PO (proponowane MAIN, #${newMainIdx + 1})</div>
+          <div style="aspect-ratio:1;background:#000;border-radius:8px;overflow:hidden;border:2px solid var(--primary);">
+            <img src="${escapeHTML(newMain)}" alt="" style="width:100%;height:100%;object-fit:contain;" />
+          </div>
+        </div>
+      </div>
+      <div class="mb-2" style="margin-top:16px;padding:12px;background:var(--card-hover);border-radius:8px;font-size:12px;">
+        <div class="mb-1"><strong>Wygenerowałoby się to imageRule:</strong></div>
+        <pre class="mono" style="font-size:11px;color:var(--text-dim);white-space:pre-wrap;">${escapeHTML(JSON.stringify({
+          id: `img-${product.id}-${newMainIdx}`,
+          offerId: product.id,
+          promote_to_main_index: newMainIdx,
+          dupSuffix: 'img_' + 'abc'[Math.min(newMainIdx - 1, 2)],
+          customLabel1: 'img_' + 'abc'[Math.min(newMainIdx - 1, 2)],
+          active: true,
+        }, null, 2))}</pre>
+      </div>
+      <button class="btn btn-block" disabled title="Write actions deferred do następnej sesji — bezpieczeństwo ponad wszystko">
+        Apply (disabled — coming next session with pre-flight diff)
+      </button>
+    </div>
+  `;
+}
+
 function renderAddVariant() {
   const form = document.getElementById('variant-form');
   const btn = document.getElementById('submit-btn');
@@ -342,6 +611,23 @@ function renderAddVariant() {
     alertEl.innerHTML = msg;
     alertEl.className = 'alert show ' + type;
   }
+
+  // Live Title Case preview for replaceWith
+  const replaceInput = document.getElementById('replaceWith');
+  const replacePreview = document.getElementById('replace-preview');
+  function updatePreview() {
+    const raw = replaceInput.value.trim();
+    if (!raw) {
+      replacePreview.textContent = '—';
+      replacePreview.style.color = 'var(--muted)';
+      return;
+    }
+    const normalized = wordCapitalize(raw);
+    replacePreview.textContent = normalized;
+    replacePreview.style.color = raw === normalized ? 'var(--success)' : 'var(--warning)';
+  }
+  replaceInput.addEventListener('input', updatePreview);
+  updatePreview();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
