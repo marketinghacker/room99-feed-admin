@@ -126,14 +126,27 @@
     <section id="section-performance" class="section">
       <div class="section-header">
         <h1 class="section-title">Performance</h1>
-        <div class="section-sub">CTR, CPC, ROAS, Search Impr. Share per variant.</div>
+        <div class="section-sub" id="perf-subtitle">Loading Google Ads snapshot…</div>
       </div>
-      <div class="placeholder">
-        <div class="placeholder-icon">⇲</div>
-        <div class="placeholder-title">Sprint 3 — Coming with Google Ads OAuth</div>
-        <div class="placeholder-text">
-          7 metrics per variant: Impressions, CTR, Avg CPC, CVR, ROAS, Search Impr Share, Unique search terms. Win criteria: 100 clicks + 3000 impressions + 95% CI + 14 days. Cannibalization detector.
+      <div id="perf-diagnosis-banner"></div>
+      <div class="kpi-strip" id="perf-summary"></div>
+      <div class="card mb-2">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="perf-campaigns-title">Top campaigns (30d)</div>
+            <div class="card-sub" id="perf-campaigns-sub">—</div>
+          </div>
         </div>
+        <div id="perf-campaigns-table">
+          <div class="loading">Ładuję…</div>
+        </div>
+      </div>
+      <div class="card" id="perf-actions-card" style="display:none;">
+        <div class="card-header">
+          <div class="card-title">Rekomendowane akcje</div>
+          <div class="card-sub">Z duplicate diagnosis</div>
+        </div>
+        <div id="perf-actions"></div>
       </div>
     </section>
 

@@ -1,0 +1,88 @@
+{
+  "snapshot_version": 1,
+  "captured_at": "2026-05-14T00:30:00Z",
+  "captured_by": "Claude Sonnet 4.7 1M via Google Ads MCP (manual snapshot — replace with cron-driven refresh in next iteration)",
+  "account": {
+    "google_ads_customer_id": "1331139339",
+    "google_ads_mcc_id": "3386507395",
+    "currency": "PLN"
+  },
+
+  "top_campaigns_30d": [
+    { "id": "20387140709", "name": "PMAX Zasłony MH",                       "channel": "PMAX",    "impressions": 1287961, "clicks": 27268, "cost_pln": 38922.55, "conv": 1779.20, "conv_value_pln": 430353.19, "roas": 11.05, "ctr": 0.0212, "cpc_pln": 1.43 },
+    { "id": "20985264378", "name": "CSS3 PM Miesięczne Bestsellery + 9692", "channel": "PMAX",    "impressions": 332926,  "clicks": 7168,  "cost_pln": 9503.03,  "conv": 452.44,  "conv_value_pln": 102620.04, "roas": 10.80, "ctr": 0.0215, "cpc_pln": 1.33 },
+    { "id": "20654207259", "name": "CSS1 Room99 (b)",                       "channel": "Shopping","impressions": 275947,  "clicks": 6076,  "cost_pln": 8594.86,  "conv": 307.04,  "conv_value_pln": 67210.38,  "roas": 7.82,  "ctr": 0.0220, "cpc_pln": 1.41 },
+    { "id": "21069335673", "name": "CSS3 PM Perfo Labalizer",               "channel": "PMAX",    "impressions": 341956,  "clicks": 7083,  "cost_pln": 7443.68,  "conv": 489.07,  "conv_value_pln": 108828.75, "roas": 14.62, "ctr": 0.0207, "cpc_pln": 1.05 },
+    { "id": "23695013721", "name": "[PLA] Firany",                          "channel": "Shopping","impressions": 257930,  "clicks": 4171,  "cost_pln": 6669.59,  "conv": 322.93,  "conv_value_pln": 67401.22,  "roas": 10.11, "ctr": 0.0162, "cpc_pln": 1.60 },
+    { "id": "23749194236", "name": "[PLA] Narzuty MH",                      "channel": "Shopping","impressions": 177760,  "clicks": 3245,  "cost_pln": 5094.00,  "conv": 174.42,  "conv_value_pln": 31339.38,  "roas": 6.15,  "ctr": 0.0183, "cpc_pln": 1.57 },
+    { "id": "23499542379", "name": "CSS2 Boost 01.2026",                    "channel": "PMAX",    "impressions": 170296,  "clicks": 4432,  "cost_pln": 4944.90,  "conv": 240.36,  "conv_value_pln": 46511.75,  "roas": 9.41,  "ctr": 0.0260, "cpc_pln": 1.12 },
+    { "id": "23749320605", "name": "PMAX Narzuty MH",                       "channel": "PMAX",    "impressions": 188649,  "clicks": 3181,  "cost_pln": 4280.49,  "conv": 186.41,  "conv_value_pln": 31668.76,  "roas": 7.40,  "ctr": 0.0169, "cpc_pln": 1.35 },
+    { "id": "22206689185", "name": "CSS2 Sembot Zasłony NetArch",           "channel": "PMAX",    "impressions": 198832,  "clicks": 3365,  "cost_pln": 3826.01,  "conv": 133.59,  "conv_value_pln": 29053.88,  "roas": 7.59,  "ctr": 0.0169, "cpc_pln": 1.14 },
+    { "id": "22339508791", "name": "Search General TEST_BM",                "channel": "Search",  "impressions": 50357,   "clicks": 2383,  "cost_pln": 3687.77,  "conv": 133.18,  "conv_value_pln": 32202.31,  "roas": 8.73,  "ctr": 0.0473, "cpc_pln": 1.55 },
+    { "id": "21911616173", "name": "Search Tree _Zasłony",                  "channel": "Search",  "impressions": 39147,   "clicks": 2199,  "cost_pln": 3533.27,  "conv": 113.00,  "conv_value_pln": 21580.79,  "roas": 6.11,  "ctr": 0.0562, "cpc_pln": 1.61 },
+    { "id": "20411598932", "name": "PMAX Firany MH",                        "channel": "PMAX",    "impressions": 189500,  "clicks": 5351,  "cost_pln": 3132.43,  "conv": 108.72,  "conv_value_pln": 24579.58,  "roas": 7.85,  "ctr": 0.0282, "cpc_pln": 0.59 },
+    { "id": "22263446825", "name": "CSS2 Sembot Narzuty",                   "channel": "PMAX",    "impressions": 127619,  "clicks": 3613,  "cost_pln": 2825.23,  "conv": 172.55,  "conv_value_pln": 28428.50,  "roas": 10.06, "ctr": 0.0283, "cpc_pln": 0.78 },
+    { "id": "23755851571", "name": "[PLA] TOFU MH",                         "channel": "Shopping","impressions": 29808,   "clicks": 563,   "cost_pln": 2724.71,  "conv": 11.30,   "conv_value_pln": 2128.58,   "roas": 0.78,  "ctr": 0.0189, "cpc_pln": 4.84 },
+    { "id": "23486410797", "name": "CSS2 PM Off White",                     "channel": "PMAX",    "impressions": 63415,   "clicks": 1949,  "cost_pln": 2505.23,  "conv": 111.67,  "conv_value_pln": 25272.96,  "roas": 10.09, "ctr": 0.0307, "cpc_pln": 1.29 }
+  ],
+
+  "duplicate_diagnosis": {
+    "status": "critical",
+    "headline": "Duplikaty t1..t7 mają 0 impressions w ostatnich 30 dniach",
+    "evidence": [
+      "Query: shopping_performance_view WHERE custom_attribute1 IN (t1..t7) AND date LAST_30_DAYS → 0 wierszy",
+      "Query: shopping_performance_view WHERE product_item_id LIKE '%_t%' AND impressions > 0 → 0 wierszy",
+      "Source feed FO ma 1841 produktów, generator tworzy 547 duplikatów w output TSV — TSV się generuje, ale duplikaty nie wchodzą do aukcji"
+    ],
+    "likely_root_causes": [
+      {
+        "code": "INVENTORY_FILTER_CONFLICT",
+        "probability": "high",
+        "title": "Custom_label_0='TITLE_TEST' nie pasuje do inventory filters istniejących kampanii",
+        "detail": "Marcin używa custom_label_0 jako product category (np. \"zasłony na taras\", \"narzuty\"). PMAX/PLA campaigns mają inventory filter scopujący po custom_label_0 do tych kategorii. Duplikaty z override custom_label_0='TITLE_TEST' wypadają poza scope → 0 impressions."
+      },
+      {
+        "code": "GMC_DISAPPROVAL_DUPES",
+        "probability": "medium",
+        "title": "GMC może odrzucić duplikaty jako 'duplicate product'",
+        "detail": "Mimo identifier_exists=no + clear GTIN/MPN, niektóre konta GMC oznaczają duplikaty z tym samym landing page jako 'duplicate-product' policy violation. Wymaga sprawdzenia w GMC Diagnostics UI."
+      },
+      {
+        "code": "SUPPLEMENTARY_FEED_NOT_LINKED",
+        "probability": "medium",
+        "title": "Output TSV z GitHub Pages nie jest podłączony do GMC jako primary feed",
+        "detail": "Jeśli output/google-pl-with-test-titles.tsv nie jest scheduled fetch w GMC, duplikaty nigdy nie trafiają do Merchant Center. Sprawdź GMC → Products → Feeds → status feed-test-titles."
+      }
+    ],
+    "recommended_actions": [
+      "1) Zmienić duplicateFieldOverrides w config.json: usunąć custom_label_0='TITLE_TEST' lub zmienić na wartość matchującą inventory filters (np. zachować original custom_label_0 z parent product).",
+      "2) Wejść w GMC → Products → All products → filter by ID contains '_t' i sprawdzić status (Active / Disapproved / Pending).",
+      "3) Wejść w GMC → Feeds i sprawdzić czy feed z GitHub Pages 'google-pl-with-test-titles.tsv' jest aktywny i kiedy ostatnio fetched."
+    ]
+  },
+
+  "underperforming_campaigns": [
+    {
+      "id": "23755851571",
+      "name": "[PLA] TOFU MH",
+      "roas": 0.78,
+      "cost_pln": 2724.71,
+      "alert": "ROAS poniżej 1.0 — spend 2724.71 PLN, conv value tylko 2128.58 PLN. Strata 596 PLN/30d. Sprawdź jeśli to acquisition campaign z innymi KPI (CPA, new customer rate) lub rozważ pauzę."
+    }
+  ],
+
+  "winner_campaigns": [
+    { "id": "21069335673", "name": "CSS3 PM Perfo Labalizer", "roas": 14.62, "note": "Highest ROAS — review bid strategy i replicate pattern do innych PMax campaigns." },
+    { "id": "20387140709", "name": "PMAX Zasłony MH",         "roas": 11.05, "note": "Largest scale + healthy ROAS — flagship campaign. Każda zmiana w feedzie powinna być najpierw verified na tej kampanii." }
+  ],
+
+  "summary_30d": {
+    "total_cost_pln": 105682.86,
+    "total_conv_value_pln": 1024401.13,
+    "blended_roas": 9.69,
+    "total_impressions": 3759303,
+    "total_clicks": 81047,
+    "blended_cpc_pln": 1.30,
+    "blended_ctr": 0.0216
+  }
+}

@@ -100,11 +100,21 @@ const RENDERERS = {
   rules: renderRules,
   hypotheses: () => {}, // static placeholder
   images: renderImages,
-  performance: () => {}, // static placeholder
+  performance: renderPerformance,
   'feed-health': renderFeedHealth,
   history: renderHistoryLink,
   'add-variant': renderAddVariant,
 };
+
+// Re-render Today when performance snapshot arrives so recommendations refresh
+async function ensurePerformanceSnapshotLoaded() {
+  if (state.perfSnapshot || state.perfSnapshotError) return;
+  try {
+    state.perfSnapshot = await fetchJSON('/api/performance-snapshot');
+  } catch (e) {
+    state.perfSnapshotError = e.message;
+  }
+}
 
 // ---------- Word Capitalize (mirror of generate-feed.js) ----------
 // Pierwsza litera każdego słowa wielka, reszta mała. Zachowuje "155x270" (x lowercase między cyframi).
@@ -156,33 +166,23 @@ async function renderToday() {
     </div>
   `;
 
-  // Decisions feed (Sprint 1: static signposts, Sprint 2 will populate from hypothesis engine)
+  // Decisions feed — fire snapshot fetch in background then re-render this card
+  await ensurePerformanceSnapshotLoaded();
   const decisionsEl = document.getElementById('decisions-feed');
-  decisionsEl.innerHTML = `
+  const decisions = buildDecisions(rules, activeRules, lastCron, state.perfSnapshot);
+  decisionsEl.innerHTML = decisions
+    .map(
+      (d) => `
     <div class="decision-card">
-      <div class="decision-icon info">●</div>
+      <div class="decision-icon ${d.severity}">${d.icon || '●'}</div>
       <div class="decision-body">
-        <div class="decision-title">${activeRules.length} aktywnych reguł generuje duplikaty</div>
-        <div class="decision-meta">Sprint 2 zaproponuje kolejne hipotezy z GSC + Google Ads</div>
+        <div class="decision-title">${d.title}</div>
+        <div class="decision-meta">${d.meta}</div>
       </div>
     </div>
-    ${lastCron && lastCron.conclusion !== 'success' ? `
-      <div class="decision-card">
-        <div class="decision-icon warning">!</div>
-        <div class="decision-body">
-          <div class="decision-title">Ostatni cron tick nie zakończył się sukcesem</div>
-          <div class="decision-meta">Status: ${escapeHTML(lastCron.conclusion || lastCron.status)} · <a href="${escapeHTML(lastCron.html_url)}" target="_blank" rel="noopener">view run →</a></div>
-        </div>
-      </div>
-    ` : ''}
-    <div class="decision-card">
-      <div class="decision-icon info">▸</div>
-      <div class="decision-body">
-        <div class="decision-title">Dodaj nowy wariant tytułu</div>
-        <div class="decision-meta">Legacy flow — <a href="#add-variant">otwórz formularz →</a></div>
-      </div>
-    </div>
-  `;
+  `
+    )
+    .join('');
 
   // Feed activity (right column)
   const activityEl = document.getElementById('feed-activity');
@@ -212,6 +212,71 @@ async function renderToday() {
       ` : '<div class="text-muted">No data</div>'}
     </div>
   `;
+}
+
+// Build heuristic Today recommendations from config + snapshot
+function buildDecisions(rules, activeRules, lastCron, snapshot) {
+  const out = [];
+
+  // 1. Critical: duplicate diagnosis if available
+  if (snapshot?.duplicate_diagnosis?.status === 'critical') {
+    out.push({
+      severity: 'warning',
+      icon: '🚨',
+      title: snapshot.duplicate_diagnosis.headline,
+      meta: `<strong>Powód #1:</strong> ${escapeHTML(snapshot.duplicate_diagnosis.likely_root_causes?.[0]?.title || '—')} · <a href="#performance">zobacz pełną diagnozę →</a>`,
+    });
+  }
+
+  // 2. Underperforming campaigns
+  if (snapshot?.underperforming_campaigns?.length) {
+    const c = snapshot.underperforming_campaigns[0];
+    out.push({
+      severity: 'warning',
+      icon: '↓',
+      title: `Kampania "${escapeHTML(c.name)}" ma ROAS ${c.roas} — strata budgetu`,
+      meta: escapeHTML(c.alert),
+    });
+  }
+
+  // 3. Winner pattern
+  if (snapshot?.winner_campaigns?.length) {
+    const w = snapshot.winner_campaigns[0];
+    out.push({
+      severity: 'info',
+      icon: '🏆',
+      title: `Top performer: ${escapeHTML(w.name)} (ROAS ${w.roas}x)`,
+      meta: escapeHTML(w.note),
+    });
+  }
+
+  // 4. Failed cron
+  if (lastCron && lastCron.conclusion !== 'success') {
+    out.push({
+      severity: 'warning',
+      icon: '!',
+      title: 'Ostatni cron tick nie zakończył się sukcesem',
+      meta: `Status: ${escapeHTML(lastCron.conclusion || lastCron.status)} · <a href="${escapeHTML(lastCron.html_url)}" target="_blank" rel="noopener">view run →</a>`,
+    });
+  }
+
+  // 5. Status summary
+  out.push({
+    severity: 'info',
+    icon: '●',
+    title: `${activeRules.length}/${rules.length} reguł aktywnych — generują duplikaty test variants`,
+    meta: 'Zarządzaj w <a href="#rules">Rules tab</a> · klik wiersza otwiera side-panel z editem',
+  });
+
+  // 6. CTA
+  out.push({
+    severity: 'info',
+    icon: '▸',
+    title: 'Dodaj nowy wariant tytułu',
+    meta: 'Legacy form (issue-based) — <a href="#add-variant">otwórz formularz →</a>',
+  });
+
+  return out;
 }
 
 async function renderRules() {
@@ -740,6 +805,131 @@ async function renderFeedHealth() {
 function renderHistoryLink() {
   const a = document.getElementById('history-temp-link');
   if (a) a.href = COMMITS_URL;
+}
+
+// ---------- PERFORMANCE ----------
+async function renderPerformance() {
+  await ensurePerformanceSnapshotLoaded();
+
+  const subtitle = document.getElementById('perf-subtitle');
+  const banner = document.getElementById('perf-diagnosis-banner');
+  const summary = document.getElementById('perf-summary');
+  const table = document.getElementById('perf-campaigns-table');
+  const actions = document.getElementById('perf-actions');
+  const actionsCard = document.getElementById('perf-actions-card');
+  const sub = document.getElementById('perf-campaigns-sub');
+
+  if (state.perfSnapshotError) {
+    subtitle.textContent = 'Błąd ładowania';
+    banner.innerHTML = `<div class="alert error show">Snapshot fetch error: ${escapeHTML(state.perfSnapshotError)}</div>`;
+    table.innerHTML = '';
+    return;
+  }
+  const s = state.perfSnapshot;
+  if (!s) return;
+
+  subtitle.innerHTML = `Live Google Ads data, ${escapeHTML((s.captured_at || '').substring(0, 16).replace('T', ' '))} UTC · account ${escapeHTML(s.account?.google_ads_customer_id || '')}`;
+
+  // Critical diagnosis banner
+  if (s.duplicate_diagnosis && s.duplicate_diagnosis.status === 'critical') {
+    banner.innerHTML = `
+      <div class="alert error show" style="font-size:14px;line-height:1.5;">
+        <strong>🚨 ${escapeHTML(s.duplicate_diagnosis.headline)}</strong>
+        <div style="margin-top:6px;font-size:13px;">Evidence:</div>
+        <ul style="margin:4px 0 8px 22px;font-size:12px;">
+          ${(s.duplicate_diagnosis.evidence || []).map((e) => `<li>${escapeHTML(e)}</li>`).join('')}
+        </ul>
+        <div style="margin-top:8px;font-size:13px;"><strong>Najbardziej prawdopodobne przyczyny:</strong></div>
+        <ol style="margin:4px 0 0 22px;font-size:12px;">
+          ${(s.duplicate_diagnosis.likely_root_causes || []).map((c) => `
+            <li style="margin-bottom:6px;">
+              <span class="pill pill-${c.probability === 'high' ? 'error' : 'warning'}" style="font-size:10px;">${escapeHTML(c.probability)}</span>
+              <strong>${escapeHTML(c.title)}</strong><br>
+              <span style="opacity:0.85;">${escapeHTML(c.detail)}</span>
+            </li>
+          `).join('')}
+        </ol>
+      </div>
+    `;
+  } else {
+    banner.innerHTML = '';
+  }
+
+  // Summary KPI strip
+  const sum = s.summary_30d || {};
+  summary.innerHTML = `
+    <div class="kpi-tile">
+      <div class="kpi-label">Blended ROAS (30d)</div>
+      <div class="kpi-value">${(sum.blended_roas || 0).toFixed(2)}<span class="text-muted" style="font-size:14px;font-weight:500;">x</span></div>
+      <div class="kpi-sub">${(sum.total_conv_value_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} PLN przychód / ${(sum.total_cost_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} PLN spend</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="kpi-label">Conversions (30d)</div>
+      <div class="kpi-value">${(sum.total_clicks || 0).toLocaleString('pl-PL')}</div>
+      <div class="kpi-sub">clicks · CTR ${((sum.blended_ctr || 0) * 100).toFixed(2)}% · CPC ${(sum.blended_cpc_pln || 0).toFixed(2)} PLN</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="kpi-label">Impressions (30d)</div>
+      <div class="kpi-value">${((sum.total_impressions || 0) / 1000).toFixed(0)}k</div>
+      <div class="kpi-sub">total reach across all campaigns</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="kpi-label">Variants in test (t1..t7)</div>
+      <div class="kpi-value" style="color:var(--error);">0<span class="text-muted" style="font-size:14px;font-weight:500;"> impr</span></div>
+      <div class="kpi-sub error" style="color:var(--error);">A/B test nie zbiera danych — patrz diagnosis powyżej</div>
+    </div>
+  `;
+
+  // Top campaigns table
+  const campaigns = s.top_campaigns_30d || [];
+  sub.textContent = `${campaigns.length} kampanii sortowane po spend · suma ${(sum.total_cost_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} PLN`;
+  table.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Campaign</th>
+          <th>Channel</th>
+          <th style="text-align:right;">Impr</th>
+          <th style="text-align:right;">Clicks</th>
+          <th style="text-align:right;">CTR</th>
+          <th style="text-align:right;">CPC PLN</th>
+          <th style="text-align:right;">Cost PLN</th>
+          <th style="text-align:right;">Conv</th>
+          <th style="text-align:right;">Conv value PLN</th>
+          <th style="text-align:right;">ROAS</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${campaigns.map((c) => {
+          const roasClass = c.roas >= 8 ? 'pill-success' : c.roas >= 3 ? 'pill-info' : c.roas >= 1 ? 'pill-warning' : 'pill-error';
+          return `
+          <tr>
+            <td><strong>${escapeHTML(c.name)}</strong><br><span class="mono text-muted" style="font-size:11px;">${escapeHTML(c.id)}</span></td>
+            <td><span class="pill pill-muted">${escapeHTML(c.channel)}</span></td>
+            <td style="text-align:right;" class="mono">${c.impressions.toLocaleString('pl-PL')}</td>
+            <td style="text-align:right;" class="mono">${c.clicks.toLocaleString('pl-PL')}</td>
+            <td style="text-align:right;" class="mono">${(c.ctr * 100).toFixed(2)}%</td>
+            <td style="text-align:right;" class="mono">${c.cpc_pln.toFixed(2)}</td>
+            <td style="text-align:right;" class="mono">${c.cost_pln.toLocaleString('pl-PL', { maximumFractionDigits: 0 })}</td>
+            <td style="text-align:right;" class="mono">${Math.round(c.conv).toLocaleString('pl-PL')}</td>
+            <td style="text-align:right;" class="mono">${c.conv_value_pln.toLocaleString('pl-PL', { maximumFractionDigits: 0 })}</td>
+            <td style="text-align:right;"><span class="pill ${roasClass}">${c.roas.toFixed(2)}x</span></td>
+          </tr>
+        `}).join('')}
+      </tbody>
+    </table>
+  `;
+
+  // Recommended actions
+  const recs = s.duplicate_diagnosis?.recommended_actions || [];
+  if (recs.length > 0) {
+    actionsCard.style.display = 'block';
+    actions.innerHTML = `
+      <ol style="margin:0 0 0 18px;font-size:13px;line-height:1.6;">
+        ${recs.map((a) => `<li style="margin-bottom:6px;">${escapeHTML(a)}</li>`).join('')}
+      </ol>
+    `;
+  }
 }
 
 // ---------- IMAGES ----------
