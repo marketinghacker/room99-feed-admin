@@ -197,9 +197,23 @@ Po 30s dostajesz URL: `https://room99-feed-admin.vercel.app` (lub custom domain)
 
 | Variable | Wymagane | Default | Co robi |
 |---|---|---|---|
-| `GITHUB_TOKEN` | TAK | - | Personal Access Token z `Issues: Write` permissionem |
+| `GITHUB_TOKEN` | TAK | - | Fine-grained PAT z permissions: **Issues: R/W**, **Contents: R/W**, **Actions: R/W**, **Metadata: R** na repo `room99-feed-duplicator` |
 | `GITHUB_OWNER` | TAK | - | Username GitHub (np. `marketinghacker`) |
-| `GITHUB_REPO` | NIE | `room99-feed-duplicator` | Nazwa repo gdzie tworzymy issues |
+| `GITHUB_REPO` | NIE | `room99-feed-duplicator` | Nazwa repo gdzie operujemy |
+
+**WAŻNE — token scope rotation w Sprint 2:** Sprint 1 wymagał tylko Issues+Contents. Sprint 2 dodał `/api/regenerate-feed` który używa `workflow_dispatch` API → wymaga dodatkowo **Actions: Read and write**. Jeśli klikasz "Regenerate now" w panelu i dostajesz error 403 "Resource not accessible by personal access token", to znaczy że token w Vercel env vars trzeba rotować z nowym scope.
+
+Procedura rotacji tokena:
+1. https://github.com/settings/tokens?type=beta → wybierz istniejący `room99-feed-admin` token albo wygeneruj nowy
+2. Repository access: `marketinghacker/room99-feed-duplicator`
+3. Permissions → Repository:
+   - **Contents**: Read and write (read config.json, edits w Sprint 3+)
+   - **Issues**: Read and write (legacy Add Variant flow)
+   - **Actions**: Read and write (workflow_dispatch dla Regenerate now)
+   - **Metadata**: Read-only (mandatory)
+4. Skopiuj nowy token (zaczyna się od `github_pat_...`)
+5. https://vercel.com/marketinghacker/room99-feed-admin/settings/environment-variables → edit `GITHUB_TOKEN` → paste new
+6. Redeploy (Vercel → Deployments → ⋮ → Redeploy latest)
 
 **Rotacja tokena:**
 - Jeśli token wycieknie (np. w logach Vercel, w czacie z AI agent) → idź do https://github.com/settings/tokens → Delete → Generate new → update Vercel env var

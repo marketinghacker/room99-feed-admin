@@ -35,9 +35,21 @@ export default async function handler(req, res) {
     // GitHub returns 204 No Content on successful dispatch
     if (r.status !== 204) {
       const details = await r.json().catch(() => ({ message: r.statusText }));
+      let userMessage = details.message || 'GitHub API error';
+
+      // Friendly 403: token scope insufficient
+      if (r.status === 403 && /not accessible|workflow/i.test(details.message || '')) {
+        userMessage =
+          'PAT w Vercel env vars nie ma scope "Actions: Read and write". ' +
+          'Wygeneruj nowy fine-grained PAT z permission "Actions: Read and write" na repo room99-feed-duplicator, ' +
+          'zaktualizuj GITHUB_TOKEN w Vercel project settings → Environment Variables → re-deploy.';
+      }
+
       return res.status(r.status).json({
-        error: details.message || 'GitHub API error',
-        details,
+        error: userMessage,
+        github_status: r.status,
+        github_message: details.message,
+        docs: 'https://docs.github.com/rest/actions/workflows#create-a-workflow-dispatch-event',
       });
     }
 
