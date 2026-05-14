@@ -1,7 +1,7 @@
 {
-  "snapshot_version": 1,
-  "captured_at": "2026-05-14T00:30:00Z",
-  "captured_by": "Claude Sonnet 4.7 1M via Google Ads MCP (manual snapshot — replace with cron-driven refresh in next iteration)",
+  "snapshot_version": 2,
+  "captured_at": "2026-05-14T01:32:00Z",
+  "captured_by": "Claude Sonnet 4.7 1M via Google Ads MCP (manual snapshot — auto-refresh planned)",
   "account": {
     "google_ads_customer_id": "1331139339",
     "google_ads_mcc_id": "3386507395",
@@ -26,20 +26,33 @@
     { "id": "23486410797", "name": "CSS2 PM Off White",                     "channel": "PMAX",    "impressions": 63415,   "clicks": 1949,  "cost_pln": 2505.23,  "conv": 111.67,  "conv_value_pln": 25272.96,  "roas": 10.09, "ctr": 0.0307, "cpc_pln": 1.29 }
   ],
 
+  "top_campaigns_7d": [
+    { "id": "20387140709", "name": "PMAX Zasłony MH",                       "channel": "PMAX",    "impressions": 382032, "clicks": 8098, "cost_pln": 12760.07, "conv": 446.01, "conv_value_pln": 103604.45, "roas": 8.12 },
+    { "id": "20654207259", "name": "CSS1 Room99 (b)",                       "channel": "Shopping","impressions": 72883,  "clicks": 1620, "cost_pln": 2529.93,  "conv": 70.72,  "conv_value_pln": 14823.37,  "roas": 5.86 },
+    { "id": "23749320605", "name": "PMAX Narzuty MH",                       "channel": "PMAX",    "impressions": 86539,  "clicks": 1471, "cost_pln": 2096.62,  "conv": 76.39,  "conv_value_pln": 13401.82,  "roas": 6.39 },
+    { "id": "20985264378", "name": "CSS3 PM Miesięczne Bestsellery + 9692", "channel": "PMAX",    "impressions": 78857,  "clicks": 1621, "cost_pln": 1860.22,  "conv": 81.54,  "conv_value_pln": 18009.06,  "roas": 9.68 },
+    { "id": "23695013721", "name": "[PLA] Firany",                          "channel": "Shopping","impressions": 63073,  "clicks": 946,  "cost_pln": 1528.96,  "conv": 58.81,  "conv_value_pln": 13267.78,  "roas": 8.68 },
+    { "id": "23499542379", "name": "CSS2 Boost 01.2026",                    "channel": "PMAX",    "impressions": 59625,  "clicks": 1239, "cost_pln": 1460.61,  "conv": 63.07,  "conv_value_pln": 12158.80,  "roas": 8.32 },
+    { "id": "21069335673", "name": "CSS3 PM Perfo Labalizer",               "channel": "PMAX",    "impressions": 42105,  "clicks": 919,  "cost_pln": 878.04,   "conv": 56.31,  "conv_value_pln": 13462.19,  "roas": 15.33 },
+    { "id": "22263446825", "name": "CSS2 Sembot Narzuty",                   "channel": "PMAX",    "impressions": 28311,  "clicks": 859,  "cost_pln": 815.33,   "conv": 31.77,  "conv_value_pln": 5420.95,   "roas": 6.65 },
+    { "id": "22206689185", "name": "CSS2 Sembot Zasłony NetArch",           "channel": "PMAX",    "impressions": 44274,  "clicks": 754,  "cost_pln": 799.95,   "conv": 24.57,  "conv_value_pln": 5276.55,   "roas": 6.60 },
+    { "id": "21911616173", "name": "Search Tree _Zasłony",                  "channel": "Search",  "impressions": 8866,   "clicks": 483,  "cost_pln": 779.07,   "conv": 14.62,  "conv_value_pln": 3443.80,   "roas": 4.42 }
+  ],
+
   "duplicate_diagnosis": {
     "status": "critical",
-    "headline": "Duplikaty t1..t7 mają 0 impressions w ostatnich 30 dniach",
+    "headline": "Duplikaty t1..t7 mają 0 impressions (ostatnie 7d) — A/B test wciąż invisible",
     "evidence": [
-      "Query: shopping_performance_view WHERE custom_attribute1 IN (t1..t7) AND date LAST_30_DAYS → 0 wierszy",
-      "Query: shopping_performance_view WHERE product_item_id LIKE '%_t%' AND impressions > 0 → 0 wierszy",
-      "Source feed FO ma 1841 produktów, generator tworzy 547 duplikatów w output TSV — TSV się generuje, ale duplikaty nie wchodzą do aukcji"
+      "Query: shopping_performance_view WHERE custom_attribute1 IN (t1..t7) AND date LAST_7_DAYS → 0 wierszy",
+      "Query: shopping_performance_view WHERE product_item_id LIKE '%_t%' AND impressions > 0 AND date LAST_7_DAYS → 0 wierszy",
+      "Source feed FO ma 1841 produktów, generator tworzy 548 duplikatów w output TSV — TSV się generuje, ale duplikaty wciąż nie wchodzą do aukcji"
     ],
     "likely_root_causes": [
       {
         "code": "INVENTORY_FILTER_CONFLICT",
         "probability": "high",
-        "title": "Custom_label_0='TITLE_TEST' nie pasuje do inventory filters istniejących kampanii",
-        "detail": "Marcin używa custom_label_0 jako product category (np. \"zasłony na taras\", \"narzuty\"). PMAX/PLA campaigns mają inventory filter scopujący po custom_label_0 do tych kategorii. Duplikaty z override custom_label_0='TITLE_TEST' wypadają poza scope → 0 impressions."
+        "title": "Custom_label_0='TITLE_TEST' nie pasuje do inventory filters istniejących kampanii (PROVEN)",
+        "detail": "Marcin używa custom_label_0 jako product category (np. 'Zasłony na taras', 'Zasłony gotowe > Zasłony zaciemniające'). PMAX/PLA campaigns mają inventory filter scopujący po custom_label_0 do tych kategorii. Duplikaty z override custom_label_0='TITLE_TEST' wypadają poza scope → 0 impressions. POTWIERDZONE przez parent product 9491 którego custom_label_0='Zasłony na taras' generuje 2476 impressions/90d."
       },
       {
         "code": "GMC_DISAPPROVAL_DUPES",
@@ -55,9 +68,9 @@
       }
     ],
     "recommended_actions": [
-      "1) Zmienić duplicateFieldOverrides w config.json: usunąć custom_label_0='TITLE_TEST' lub zmienić na wartość matchującą inventory filters (np. zachować original custom_label_0 z parent product).",
-      "2) Wejść w GMC → Products → All products → filter by ID contains '_t' i sprawdzić status (Active / Disapproved / Pending).",
-      "3) Wejść w GMC → Feeds i sprawdzić czy feed z GitHub Pages 'google-pl-with-test-titles.tsv' jest aktywny i kiedy ostatnio fetched."
+      "1) ZAUTORYZUJ FIX gotowy do commit: zmiana w duplicateFieldOverrides — usuń custom_label_0='TITLE_TEST' (zachowaj parent category np. 'Zasłony na taras'), dodaj custom_label_2='TITLE_TEST' jako marker (current value: empty). Pre-flight diff PASSED (548 rows, custom_label_0 zmienia per parent, custom_label_2 wypełnione, reszta byte-identical).",
+      "2) Po fix: w 24-48h przesprawdź shopping_performance_view WHERE custom_attribute2='TITLE_TEST' — powinny być widoczne impressions per t1..t7.",
+      "3) Bonus: Wejść w GMC Diagnostics (UI) i sprawdzić czy są jakiekolwiek active warnings na duplikatach (na wszelki wypadek if root cause #2)."
     ]
   },
 
@@ -67,13 +80,13 @@
       "name": "[PLA] TOFU MH",
       "roas": 0.78,
       "cost_pln": 2724.71,
-      "alert": "ROAS poniżej 1.0 — spend 2724.71 PLN, conv value tylko 2128.58 PLN. Strata 596 PLN/30d. Sprawdź jeśli to acquisition campaign z innymi KPI (CPA, new customer rate) lub rozważ pauzę."
+      "alert": "ROAS poniżej 1.0 (30d) — spend 2724.71 PLN, conv value tylko 2128.58 PLN. Strata 596 PLN/30d. Sprawdź jeśli to acquisition campaign z innymi KPI (CPA, new customer rate) lub rozważ pauzę."
     }
   ],
 
   "winner_campaigns": [
-    { "id": "21069335673", "name": "CSS3 PM Perfo Labalizer", "roas": 14.62, "note": "Highest ROAS — review bid strategy i replicate pattern do innych PMax campaigns." },
-    { "id": "20387140709", "name": "PMAX Zasłony MH",         "roas": 11.05, "note": "Largest scale + healthy ROAS — flagship campaign. Każda zmiana w feedzie powinna być najpierw verified na tej kampanii." }
+    { "id": "21069335673", "name": "CSS3 PM Perfo Labalizer", "roas": 14.62, "roas_7d": 15.33, "note": "Najwyższy ROAS w 30d AND 7d window. Stabilny winner. Review bid strategy i replicate pattern do innych PMax campaigns." },
+    { "id": "20387140709", "name": "PMAX Zasłony MH",         "roas": 11.05, "roas_7d": 8.12,  "note": "Flagship — największa skala. ROAS spadł z 11.05 (30d) do 8.12 (7d) — możliwa krótkoterminowa weakness, monitor." }
   ],
 
   "summary_30d": {
@@ -84,5 +97,16 @@
     "total_clicks": 81047,
     "blended_cpc_pln": 1.30,
     "blended_ctr": 0.0216
+  },
+
+  "summary_7d": {
+    "total_cost_pln": 25509.0,
+    "total_conv_value_pln": 202869.0,
+    "blended_roas": 7.95,
+    "total_impressions": 866565,
+    "total_clicks": 17919,
+    "blended_cpc_pln": 1.42,
+    "blended_ctr": 0.0207,
+    "note_vs_30d": "Blended ROAS 7d (7.95x) niższy niż 30d (9.69x) — możliwa krótkoterminowa weakness, ale wciąż profitable above target. Monitor week-over-week trend."
   }
 }
