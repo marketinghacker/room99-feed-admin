@@ -311,9 +311,33 @@ Marcin chce więcej funkcji. Najprawdopodobniejsze:
 
 ---
 
-## 12. AKTUALNY STAN
+## 12. AKTUALNY STAN — co działa, co nie (PEŁNA TRANSPARENCJA)
 
-### Sprint 3 (2026-05-14) — Rule editing + GMC validator + regenerate fallback
+| Sekcja | Działa? | Co konkretnie |
+|---|---|---|
+| **Today** | ✅ działa w pełni | 4 KPI tiles z live snapshot + 5-6 actionable decisions (heuristic z snapshot + config) + Feed activity card |
+| **Rules** | ✅ pełne CRUD | Read live config · inline status toggle · side-panel edit (impact preview, validators, samples, diff) · delete · auto-fallback do Issue gdy 403 |
+| **Hypotheses** | ✅ live recommendations | 5+ kart ranked (critical/high/medium/low) generowane z snapshot + config heuristic. NIE placeholder. |
+| **Images** | ✅ Apply enabled | Browse 1841 produktów · per-product gallery · BEFORE/AFTER preview · **Apply commits image rule** (direct OR Issue fallback). Generation gated by `feature_flags.image_rules_enabled=false` w config.json — flip flag żeby aktywować generation. |
+| **Performance** | ✅ live snapshot | Top 15 campaigns 30d + Top 10 campaigns 7d + diagnosis banner + 4 KPI tiles + summary (blended ROAS 30d=9.69x, 7d=7.95x). Snapshot refreshed manually via MCP — auto-refresh planned. |
+| **Feed Health** | ✅ + Regenerate | Cron status · ⟳ Regenerate now (3-tier fallback: dispatch → touch → Issue) |
+| **History** | ✅ live commits | 30 ostatnich commitów na config.json z icon (feat/fix/chore/auto-regen), short SHA, author, relative time, click-through link |
+| **Add Variant** | ✅ legacy form | Tworzy GitHub Issue (workflow processuje) + Title Case live preview |
+| **Health Banner** | ✅ top of page | "System ready — auto-fallback do Issue" · auto-dismiss 12s |
+
+### NIC nie jest "Coming in Sprint X" w UI. Każda sekcja ma realny content i działa.
+
+### ZNANE OGRANICZENIA (Marcin może zaakceptować lub fix):
+
+1. **Token scope w Vercel env (PAT)**: aktualnie tylko Contents:Read + Issues:R/W. Direct PATCH na config.json zwraca 403, ALE wszystkie write paths mają auto-fallback przez Issue (workflow `handle-rule-action-issue.yml` w feed-duplicator processuje z built-in token). Marcin nie musi rotować — wszystko działa. JEŚLI Marcin chce direct writes (instant zamiast +30s Issue workflow): rotate PAT z Contents:R/W + Actions:R/W (instrukcja w sekcji 6).
+
+2. **A/B test duplikatów ma 0 impressions od 2 miesięcy**: KRYTYCZNE — proven via shopping_performance_view query. Hypothesis (high probability): `custom_label_0='TITLE_TEST'` override w config.json `duplicateFieldOverrides` powoduje że duplikaty wypadają poza inventory filter wszystkich PMAX/PLA campaigns Marcina (które są scoped na product category). **Fix przygotowany** lokalnie z pre-flight diff PASSED — czeka na Marcin TAK/NIE. Po fix duplikaty wpadną do tych samych campaigns co parent products, TITLE_TEST przeniesione na `custom_label_2` (unused slot).
+
+3. **Performance snapshot refresh = manual**: Snapshot.json compiluje JA via MCP queries manualnie. Auto-refresh wymaga Vercel Cron + Google Ads OAuth (developer token + refresh token w env) — następna iteracja.
+
+4. **Image rules generation gated**: `feature_flags.image_rules_enabled=false` w config.json. Image rules zapisane w config (przez Apply button), ale generate-feed.js NIE generuje image-variant duplikatów dopóki Marcin nie flip flag → true. To safety gate.
+
+### Sprint 3+ (2026-05-14) — DONE
 - ✅ `api/rule-impact.js` — POST returns `matched_count`, 3 sample title transformations, validators (title length 30/70/150, CAPS ratio, promo words, search-not-found-in-match, zero-match, rule overlap, dupSuffix duplicate). Mirror of `wordCapitalize()` in generate-feed.js.
 - ✅ `api/rules/[id].js` — PATCH (`action: toggle | set_active | edit`) and DELETE with ETag race-safety + 3× retry on 409. Mutations: validate dupSuffix uniqueness, write `updated_at`, mirror customLabel1 to dupSuffix. Friendly 403 message if PAT scope lacks Contents:R/W.
 - ✅ `api/regenerate-feed.js` — two-tier strategy: tries `workflow_dispatch` first, falls back to `config.json` touch (`_lastTouched` field) which triggers regenerate-feed.yml via push event (paths: config.json). Works with only Contents:R/W scope.
@@ -344,12 +368,15 @@ Marcin chce więcej funkcji. Najprawdopodobniejsze:
 - ✅ Graceful degradation if API endpoints fail (error alerts in UI)
 - ✅ Zero writes to production data in Sprint 1
 
-### Roadmap
-- **Sprint 2:** Rules CRUD via direct PATCH on config.json, hypothesis pipeline (GSC + Ads + GA4, no Ahrefs), pre-flight diff verification
-- **Sprint 3:** Image Manager (gallery, set-as-main, A/B variants via custom_label_1=img_a/b/c), Performance MVP
-- **Sprint 4:** "Why It Won" cards, Feed Health alerts, History timeline + rollback, polish + undo toasts
+### Co może być następne (jeśli Marcin chce):
 
-Full plan: `/Users/marcinmichalski/.claude/plans/rippling-beaming-canyon.md` (also pushed to git as design doc).
+1. Auto-refresh snapshot.json via Vercel Cron (wymaga Google Ads OAuth setup)
+2. "Why It Won" card per winning rule (wymaga performance data per t1..t7 — DEPENDS na fix #2 z "Znane ograniczenia")
+3. Cannibalization monitor (original SKU baseline vs duplicates)
+4. Bulk operations (multi-select rules → bulk toggle)
+5. Bing/Meta feed export
+
+Full plan: `/Users/marcinmichalski/.claude/plans/rippling-beaming-canyon.md` (pushed do git jako design doc).
 
 ---
 
