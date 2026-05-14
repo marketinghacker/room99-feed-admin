@@ -179,7 +179,7 @@ export default async function handler(req, res) {
 
     if (action === 'edit') {
       const changes = body.changes || {};
-      const allowedFields = ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes', 'active'];
+      const allowedFields = ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes', 'active', 'testType', 'descriptionOverride'];
       const filteredChanges = {};
       for (const key of allowedFields) {
         if (changes[key] !== undefined) filteredChanges[key] = changes[key];
@@ -198,13 +198,36 @@ export default async function handler(req, res) {
                 return { validationError: `dupSuffix "${dupSuffix}" already used in rule "${collision.id}"` };
               }
             }
+            // testType validation
+            if (filteredChanges.testType !== undefined) {
+              const tt = filteredChanges.testType;
+              if (!['title', 'description', 'both'].includes(tt)) {
+                return { validationError: `testType must be one of: title, description, both (got "${tt}")` };
+              }
+            }
+            // descriptionOverride length check
+            if (filteredChanges.descriptionOverride && filteredChanges.descriptionOverride.length > 4950) {
+              return { validationError: `descriptionOverride exceeds 4950 chars (got ${filteredChanges.descriptionOverride.length}) — Google PLA limit is 5000` };
+            }
+            // For title-type tests, searchInTitle and replaceWith must be non-empty
+            const effectiveTestType = filteredChanges.testType !== undefined ? filteredChanges.testType : (rules[idx].testType || 'title');
             for (const key of ['matchInTitle', 'searchInTitle', 'replaceWith']) {
               if (filteredChanges[key] !== undefined && !String(filteredChanges[key]).trim()) {
+                // For description-only test, searchInTitle/replaceWith MAY be empty if descriptionOverride is present
+                if (effectiveTestType === 'description' && (key === 'searchInTitle' || key === 'replaceWith')) {
+                  const hasOverride = (filteredChanges.descriptionOverride !== undefined ? filteredChanges.descriptionOverride : rules[idx].descriptionOverride);
+                  if (hasOverride) continue; // OK — full override means search/replace not needed
+                }
                 return { validationError: `${key} cannot be empty` };
               }
             }
             for (const [k, v] of Object.entries(filteredChanges)) {
-              rules[idx][k] = v;
+              // Treat empty descriptionOverride as removal
+              if (k === 'descriptionOverride' && (!v || !String(v).trim())) {
+                delete rules[idx].descriptionOverride;
+              } else {
+                rules[idx][k] = v;
+              }
             }
             rules[idx].updated_at = new Date().toISOString();
             if (filteredChanges.dupSuffix && (!rules[idx].customLabel1 || rules[idx].customLabel1 === rules[idx].dupSuffix)) {

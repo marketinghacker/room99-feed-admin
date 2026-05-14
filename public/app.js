@@ -1,44 +1,86 @@
-// Room99 Feed Command Center — Sprint 2 (read-only with manual regenerate trigger)
-// Vanilla JS SPA: hash router, fetch helpers, section renderers.
-// Zero deps. Write actions to config.json deferred — pre-flight diff infra first.
+// Room99 Feed Command Center — IA Redesign (4 sections)
+// Dziś · Testy · Pomysły · Sklep (perf/health/history subtabs)
 
 const REPO_URL = 'https://github.com/marketinghacker/room99-feed-duplicator';
 const CONFIG_URL = REPO_URL + '/blob/main/config.json';
 const COMMITS_URL = REPO_URL + '/commits/main/config.json';
 
 // ---------- Router ----------
-const SECTIONS = ['today', 'rules', 'hypotheses', 'images', 'performance', 'feed-health', 'history', 'add-variant'];
+const SECTIONS = ['today', 'tests', 'ideas', 'shop'];
+const SHOP_SUBTABS = ['perf', 'health', 'history'];
 const RENDERED = new Set();
 
-function activateTab(tab) {
-  if (!SECTIONS.includes(tab)) tab = 'today';
+// Legacy hash aliases — old links keep working
+const HASH_ALIASES = {
+  rules: 'tests',
+  images: 'tests',
+  hypotheses: 'ideas',
+  'add-variant': 'tests', // opens add panel separately
+  performance: 'shop/perf',
+  'feed-health': 'shop/health',
+  history: 'shop/history',
+};
+
+function parseHash() {
+  const raw = (location.hash || '#today').replace(/^#/, '');
+  // Apply alias if any
+  if (HASH_ALIASES[raw]) {
+    return parseHash._fromString(HASH_ALIASES[raw]);
+  }
+  return parseHash._fromString(raw);
+}
+parseHash._fromString = function (s) {
+  const [tab, sub] = s.split('/');
+  return {
+    tab: SECTIONS.includes(tab) ? tab : 'today',
+    sub: sub || null,
+  };
+};
+
+function activateTab({ tab, sub }) {
   document.querySelectorAll('.section').forEach((el) => el.classList.remove('active'));
   document.querySelectorAll('.tabs a').forEach((el) => el.classList.toggle('active', el.dataset.tab === tab));
   const sec = document.getElementById('section-' + tab);
   if (sec) sec.classList.add('active');
+
   // Lazy render
   if (!RENDERED.has(tab)) {
     const renderer = RENDERERS[tab];
     if (renderer) renderer();
     RENDERED.add(tab);
   }
+
+  // Shop subtabs
+  if (tab === 'shop') {
+    const activeSub = SHOP_SUBTABS.includes(sub) ? sub : 'perf';
+    document.querySelectorAll('.subtab').forEach((el) => el.classList.toggle('active', el.dataset.subtab === activeSub));
+    document.querySelectorAll('.subsection').forEach((el) => (el.style.display = 'none'));
+    const subEl = document.getElementById('shop-' + activeSub);
+    if (subEl) subEl.style.display = 'block';
+
+    // Lazy render subsection
+    if (!RENDERED.has('shop-' + activeSub)) {
+      const subRenderer = SHOP_RENDERERS[activeSub];
+      if (subRenderer) subRenderer();
+      RENDERED.add('shop-' + activeSub);
+    }
+  }
 }
 
 function onHashChange() {
-  const tab = (location.hash || '#today').replace(/^#/, '');
-  activateTab(tab);
+  activateTab(parseHash());
 }
 
 // ---------- Fetch helpers ----------
-async function fetchJSON(url) {
-  const r = await fetch(url);
+async function fetchJSON(url, options) {
+  const r = await fetch(url, options);
   if (!r.ok) {
     let detail = '';
     try {
       const j = await r.json();
       detail = j.error || JSON.stringify(j).substring(0, 120);
     } catch {
-      // Non-JSON body (e.g. HTML 404 page from static server) — drop it
+      // non-JSON body — drop it
     }
     throw new Error(`${r.status} ${r.statusText}${detail ? ' — ' + detail : ''}`);
   }
@@ -67,6 +109,14 @@ function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+// Word Capitalize — mirror of generate-feed.js
+function wordCapitalize(s) {
+  if (!s) return '';
+  return String(s)
+    .toLowerCase()
+    .replace(/(?<![\p{L}\d])(\p{L})(\p{L}*)/gu, (m, first, rest) => first.toUpperCase() + rest);
+}
+
 // ---------- State ----------
 const state = {
   config: null,
@@ -74,6 +124,11 @@ const state = {
   feedStats: null,
   configError: null,
   statsError: null,
+  perfSnapshot: null,
+  perfSnapshotError: null,
+  matchCounts: {}, // ruleId -> count, cached
+  testsFilter: 'all', // all | title | description | both | image
+  expandedTestId: null,
 };
 
 async function loadCoreData() {
@@ -94,19 +149,6 @@ async function loadCoreData() {
   }
 }
 
-// ---------- Renderers ----------
-const RENDERERS = {
-  today: renderToday,
-  rules: renderRules,
-  hypotheses: renderHypotheses,
-  images: renderImages,
-  performance: renderPerformance,
-  'feed-health': renderFeedHealth,
-  history: renderHistory,
-  'add-variant': renderAddVariant,
-};
-
-// Re-render Today when performance snapshot arrives so recommendations refresh
 async function ensurePerformanceSnapshotLoaded() {
   if (state.perfSnapshot || state.perfSnapshotError) return;
   try {
@@ -116,23 +158,47 @@ async function ensurePerformanceSnapshotLoaded() {
   }
 }
 
-// ---------- Word Capitalize (mirror of generate-feed.js) ----------
-// Pierwsza litera każdego słowa wielka, reszta mała. Zachowuje "155x270" (x lowercase między cyframi).
-// Negative lookbehind: litera musi NIE być poprzedzona przez literę ANI cyfrę.
-function wordCapitalize(s) {
-  if (!s) return '';
-  return String(s)
-    .toLowerCase()
-    .replace(/(?<![\p{L}\d])(\p{L})(\p{L}*)/gu, (m, first, rest) => first.toUpperCase() + rest);
+async function reloadConfig() {
+  try {
+    const data = await fetchJSON('/api/config');
+    state.config = data.config;
+    state.configSha = data.sha;
+    state.configError = null;
+  } catch (e) {
+    state.configError = e.message;
+  }
 }
 
+let _coreLoaded = null;
+function ensureCoreLoaded() {
+  if (!_coreLoaded) _coreLoaded = loadCoreData();
+  return _coreLoaded;
+}
+
+// ---------- Renderers map ----------
+const RENDERERS = {
+  today: renderToday,
+  tests: renderTests,
+  ideas: renderIdeas,
+  shop: renderShop,
+};
+const SHOP_RENDERERS = {
+  perf: renderPerformance,
+  health: renderFeedHealth,
+  history: renderHistory,
+};
+
+// ====================================================================
+// DZIŚ
+// ====================================================================
 async function renderToday() {
   await ensureCoreLoaded();
 
-  // KPI strip
   const kpiEl = document.getElementById('kpi-strip');
   const rules = state.config?.duplicateRules || [];
-  const activeRules = rules.filter((r) => r.active);
+  const images = state.config?.imageRules || [];
+  const allTests = [...rules, ...images];
+  const activeTests = allTests.filter((r) => r.active !== false);
   const outputRows = state.feedStats?.output?.total_rows ?? '—';
   const lastCron = state.feedStats?.last_cron_run;
   const lastChange = state.feedStats?.last_config_change;
@@ -146,13 +212,13 @@ async function renderToday() {
   kpiEl.innerHTML = `
     <div class="kpi-tile">
       <div class="kpi-label">Twoje testy</div>
-      <div class="kpi-value">${activeRules.length}<span class="text-muted" style="font-size:14px;font-weight:500;"> z ${rules.length}</span></div>
-      <div class="kpi-sub">${rules.length - activeRules.length === 0 ? 'wszystkie aktywne' : (rules.length - activeRules.length) + ' na pauzie'}</div>
+      <div class="kpi-value">${activeTests.length}<span class="text-muted" style="font-size:14px;font-weight:500;"> z ${allTests.length}</span></div>
+      <div class="kpi-sub">${allTests.length - activeTests.length === 0 ? 'wszystkie aktywne' : (allTests.length - activeTests.length) + ' na pauzie'}</div>
     </div>
     <div class="kpi-tile">
       <div class="kpi-label">Wariantów w sklepie</div>
       <div class="kpi-value">${outputRows.toLocaleString ? outputRows.toLocaleString('pl-PL') : outputRows}</div>
-      <div class="kpi-sub">kopii produktów z testowymi tytułami</div>
+      <div class="kpi-sub">kopii produktów z testowymi tytułami/opisami</div>
     </div>
     <div class="kpi-tile">
       <div class="kpi-label">Ostatnie odświeżenie</div>
@@ -166,10 +232,9 @@ async function renderToday() {
     </div>
   `;
 
-  // Decisions feed — fire snapshot fetch in background then re-render this card
   await ensurePerformanceSnapshotLoaded();
   const decisionsEl = document.getElementById('decisions-feed');
-  const decisions = buildDecisions(rules, activeRules, lastCron, state.perfSnapshot);
+  const decisions = buildDecisions(rules, activeTests, lastCron, state.perfSnapshot);
   decisionsEl.innerHTML = decisions
     .map(
       (d) => `
@@ -184,7 +249,6 @@ async function renderToday() {
     )
     .join('');
 
-  // Feed activity (right column)
   const activityEl = document.getElementById('feed-activity');
   activityEl.innerHTML = `
     <div class="mb-2">
@@ -214,21 +278,18 @@ async function renderToday() {
   `;
 }
 
-// Co dziś warto zrobić — pomysły wybrane z danych
-function buildDecisions(rules, activeRules, lastCron, snapshot) {
+function buildDecisions(rules, activeTests, lastCron, snapshot) {
   const out = [];
 
-  // 1. Najpilniejsze: jeśli A/B test nie zbiera danych
   if (snapshot?.duplicate_diagnosis?.status === 'critical') {
     out.push({
       severity: 'warning',
       icon: '!',
       title: 'Twój test tytułów nie zbiera danych — warto to naprawić',
-      meta: `${escapeHTML(snapshot.duplicate_diagnosis.likely_root_causes?.[0]?.title || 'Nieznana przyczyna')} · <a href="#hypotheses">zobacz całą diagnozę →</a>`,
+      meta: `${escapeHTML(snapshot.duplicate_diagnosis.likely_root_causes?.[0]?.title || 'Nieznana przyczyna')} · <a href="#ideas">zobacz całą diagnozę →</a>`,
     });
   }
 
-  // 2. Kampania traci pieniądze
   if (snapshot?.underperforming_campaigns?.length) {
     const c = snapshot.underperforming_campaigns[0];
     const lostPln = (c.cost_pln - (c.cost_pln * c.roas)).toFixed(0);
@@ -236,22 +297,20 @@ function buildDecisions(rules, activeRules, lastCron, snapshot) {
       severity: 'warning',
       icon: '↓',
       title: `Kampania „${escapeHTML(c.name)}" traci pieniądze`,
-      meta: `Każda zł wydana zwraca tylko ${c.roas} zł — strata około ${Math.abs(lostPln)} zł na miesiąc. <a href="#performance">zobacz szczegóły →</a>`,
+      meta: `Każda zł wydana zwraca tylko ${c.roas} zł — strata około ${Math.abs(lostPln)} zł na miesiąc. <a href="#shop/perf">zobacz szczegóły →</a>`,
     });
   }
 
-  // 3. Najlepsza kampania
   if (snapshot?.winner_campaigns?.length) {
     const w = snapshot.winner_campaigns[0];
     out.push({
       severity: 'success',
       icon: '★',
       title: `Najlepsza kampania: „${escapeHTML(w.name)}"`,
-      meta: `Każda 1 zł zwraca ${w.roas} zł. Spróbuj zastosować jej ustawienia w innych kampaniach. <a href="#performance">zobacz →</a>`,
+      meta: `Każda 1 zł zwraca ${w.roas} zł. Spróbuj zastosować jej ustawienia w innych kampaniach. <a href="#shop/perf">zobacz →</a>`,
     });
   }
 
-  // 4. Sklep się nie odświeżył
   if (lastCron && lastCron.conclusion !== 'success') {
     out.push({
       severity: 'error',
@@ -261,108 +320,214 @@ function buildDecisions(rules, activeRules, lastCron, snapshot) {
     });
   }
 
-  // 5. Status testów
   out.push({
     severity: 'info',
     icon: '●',
-    title: `${activeRules.length === 1 ? '1 test biegnie' : activeRules.length + ' testów biegnie'} w Twoim sklepie`,
-    meta: `Każdy generuje warianty produktów w Google Shopping. <a href="#rules">otwórz listę →</a>`,
+    title: `${activeTests.length === 1 ? '1 test biegnie' : activeTests.length + ' testów biegnie'} w Twoim sklepie`,
+    meta: `Każdy generuje warianty produktów w Google Shopping. <a href="#tests">otwórz listę →</a>`,
   });
 
-  // 6. Nowy pomysł
   out.push({
     severity: 'muted',
     icon: '+',
-    title: 'Masz pomysł na nowy tytuł?',
-    meta: '<a href="#add-variant">otwórz formularz →</a> — nowy wariant wjedzie do sklepu w ciągu godziny',
+    title: 'Masz pomysł na nowy tytuł albo opis?',
+    meta: '<a href="#tests" onclick="event.preventDefault();location.hash=\'#tests\';setTimeout(openAddPanel,150)">otwórz panel dodawania →</a> — nowy wariant wjedzie do sklepu w ciągu godziny',
   });
 
   return out;
 }
 
-async function renderRules() {
-  await ensureCoreLoaded();
-  // Re-fetch latest config on each render so toggles/edits stay fresh
-  await reloadConfig();
+// ====================================================================
+// TESTY — unified table (title + description + image)
+// ====================================================================
 
-  const linkEl = document.getElementById('rules-source-link');
-  linkEl.href = CONFIG_URL;
+function unifyTests(config) {
+  const ruleTests = (config?.duplicateRules || []).map((r) => ({
+    kind: 'rule',
+    id: r.id,
+    testType: r.testType || 'title',
+    dupSuffix: r.dupSuffix,
+    matchInTitle: r.matchInTitle,
+    searchInTitle: r.searchInTitle,
+    replaceWith: r.replaceWith,
+    descriptionOverride: r.descriptionOverride,
+    customLabel1: r.customLabel1,
+    active: r.active,
+    notes: r.notes,
+    raw: r,
+  }));
+  const imgTests = (config?.imageRules || []).map((r) => ({
+    kind: 'image',
+    id: r.id,
+    testType: 'image',
+    dupSuffix: r.dupSuffix,
+    offerId: r.offerId,
+    promote_to_main_index: r.promote_to_main_index,
+    custom_image_url: r.custom_image_url,
+    customLabel1: r.customLabel1,
+    active: r.active !== false,
+    notes: r.notes,
+    raw: r,
+  }));
+  return [...ruleTests, ...imgTests];
+}
+
+function typeBadgeHTML(testType) {
+  const map = {
+    title: { cls: 'type-title', label: 'T', title: 'Test tytułu' },
+    description: { cls: 'type-description', label: 'D', title: 'Test opisu' },
+    both: { cls: 'type-both', label: 'T+D', title: 'Test tytułu i opisu' },
+    image: { cls: 'type-image', label: 'I', title: 'Test zdjęcia' },
+  };
+  const m = map[testType] || map.title;
+  return `<span class="type-badge ${m.cls}" title="${m.title}">${m.label}</span>`;
+}
+
+function winnerPillHTML(test, snapshot) {
+  // Look up perf data from snapshot.rules_campaign_mapping by dupSuffix
+  const mapping = (snapshot?.rules_campaign_mapping || []).find((m) => m.dupSuffix === test.dupSuffix);
+  if (!mapping) return '<span class="winner-pill winner-pending">— czeka na dane</span>';
+
+  // If mapping shows test isn't collecting data (e.g. needs_ad_group_creation)
+  if (mapping.match_status === 'needs_ad_group_creation') {
+    return '<span class="winner-pill winner-pending">brak ad-group</span>';
+  }
+  if (mapping.match_status === 'ready_after_fix') {
+    return '<span class="winner-pill winner-pending">czeka na fix</span>';
+  }
+
+  // Compare ratio if available — assume mapping has variant_roas vs baseline_roas
+  const variant = mapping.variant_roas || mapping.roas;
+  const baseline = mapping.baseline_roas || snapshot?.summary_30d?.blended_roas || null;
+  if (!variant || !baseline) return '<span class="winner-pill winner-pending">— czeka</span>';
+
+  const ratio = variant / baseline;
+  let cls = 'winner-amber';
+  let symbol = '~';
+  if (ratio >= 1.15) { cls = 'winner-green'; symbol = '↑'; }
+  else if (ratio <= 0.85) { cls = 'winner-red'; symbol = '↓'; }
+  return `<span class="winner-pill ${cls}"><span class="arrow">${symbol}</span> ${ratio.toFixed(2)}× baseline</span>`;
+}
+
+function scopeLabelHTML(test) {
+  if (test.kind === 'image') {
+    return `<span class="pill pill-muted">offer ${escapeHTML(test.offerId || '—')}</span>`;
+  }
+  return `<span class="pill pill-muted">${escapeHTML(test.matchInTitle || '—')}</span>`;
+}
+
+function transformationCellHTML(test) {
+  if (test.kind === 'image') {
+    if (test.custom_image_url) return '<div style="font-weight:500;">Custom URL</div><div class="text-dim mono" style="font-size:11px;">' + escapeHTML(test.custom_image_url.slice(0, 50)) + '…</div>';
+    return `<div style="font-weight:500;">Zdjęcie #${test.promote_to_main_index} → MAIN</div><div class="text-dim mono" style="font-size:11px;">promote_to_main_index</div>`;
+  }
+  // title/description/both
+  const arrow = test.testType === 'description' ? 'w opisie:' : (test.testType === 'both' ? 'w tytule i opisie:' : '');
+  return `
+    <div class="text-dim mono" style="font-size:11px;">${arrow ? `<em style="font-style:italic;color:var(--muted);">${arrow}</em> ` : ''}${escapeHTML(test.searchInTitle || '')}</div>
+    <div style="font-weight:500;">${escapeHTML(test.replaceWith || '')}</div>
+    ${test.descriptionOverride ? '<div class="text-muted" style="font-size:11px;font-style:italic;margin-top:3px;">+ pełny override opisu (' + test.descriptionOverride.length + ' znaków)</div>' : ''}
+  `;
+}
+
+async function renderTests() {
+  await ensureCoreLoaded();
+  await reloadConfig();
+  await ensurePerformanceSnapshotLoaded();
+
+  // Source link
+  const linkEl = document.getElementById('tests-source-link');
+  if (linkEl) linkEl.href = CONFIG_URL;
+
+  // Filter chips
+  document.querySelectorAll('.filter-chip').forEach((chip) => {
+    if (chip.dataset.bound === '1') return;
+    chip.dataset.bound = '1';
+    chip.addEventListener('click', () => {
+      state.testsFilter = chip.dataset.filter;
+      document.querySelectorAll('.filter-chip').forEach((c) => c.classList.toggle('active', c === chip));
+      renderTestsTable();
+    });
+  });
+
+  // + Nowy test button
+  const addBtn = document.getElementById('add-test-btn');
+  if (addBtn && addBtn.dataset.bound !== '1') {
+    addBtn.dataset.bound = '1';
+    addBtn.addEventListener('click', openAddPanel);
+  }
 
   if (state.configError) {
-    document.getElementById('rules-count').textContent = 'Błąd ładowania';
-    document.getElementById('rules-table-wrap').innerHTML =
-      `<div class="alert error show">Nie udało się pobrać reguł: ${escapeHTML(state.configError)}</div>`;
+    document.getElementById('tests-count').textContent = 'Błąd ładowania';
+    document.getElementById('tests-table-wrap').innerHTML =
+      `<div class="alert error show">Nie udało się pobrać testów: ${escapeHTML(state.configError)}</div>`;
     return;
   }
 
-  const rules = state.config?.duplicateRules || [];
-  const active = rules.filter((r) => r.active).length;
-  document.getElementById('rules-count').textContent =
-    `${rules.length} reguł · ${active} aktywnych · ${rules.length - active} nieaktywnych · klik wiersz aby edytować`;
+  renderTestsTable();
+}
 
-  if (rules.length === 0) {
-    document.getElementById('rules-table-wrap').innerHTML =
-      '<div class="placeholder"><div class="placeholder-title">Brak reguł</div></div>';
+function renderTestsTable() {
+  const tests = unifyTests(state.config);
+  const filtered = state.testsFilter === 'all' ? tests : tests.filter((t) => t.testType === state.testsFilter);
+  const active = filtered.filter((t) => t.active).length;
+
+  document.getElementById('tests-count').textContent =
+    state.testsFilter === 'all'
+      ? `${tests.length} testów łącznie · ${tests.filter((t) => t.active).length} aktywnych · klik wiersz aby rozwinąć`
+      : `${filtered.length} ${filtered.length === 1 ? 'test' : 'testów'} typu „${state.testsFilter}" · ${active} aktywnych`;
+
+  const tableWrap = document.getElementById('tests-table-wrap');
+
+  if (filtered.length === 0) {
+    tableWrap.innerHTML = `
+      <div class="placeholder">
+        <div class="placeholder-title">Brak testów ${state.testsFilter !== 'all' ? `typu „${state.testsFilter}"` : ''}</div>
+        <div class="placeholder-text">Dodaj pierwszy klikając „+ Nowy test" powyżej.</div>
+      </div>
+    `;
     return;
   }
 
-  // Mapping kampanii z snapshot (jeśli dostępne)
-  const mappingByDupSuffix = {};
-  for (const m of (state.perfSnapshot?.rules_campaign_mapping || [])) {
-    if (m.dupSuffix) mappingByDupSuffix[m.dupSuffix] = m;
-  }
+  const snapshot = state.perfSnapshot;
 
-  const rows = rules
-    .map(
-      (r) => {
-        const m = mappingByDupSuffix[r.dupSuffix];
-        let campaignCell;
-        if (m && m.match_status === 'ready_after_fix') {
-          campaignCell = `<div style="font-size:13px;line-height:1.4;">${escapeHTML(m.target_campaign_name || '—')}</div>
-            <div class="text-muted" style="font-size:11px;font-style:italic;">grupa: ${escapeHTML(m.target_ad_group || '—')}</div>
-            <div class="pill pill-warning" style="margin-top:4px;font-size:10px;">czeka na fix custom_label_8</div>`;
-        } else if (m && m.match_status === 'needs_ad_group_creation') {
-          campaignCell = `<div class="pill pill-error" style="font-size:10px;">brak ad-group w żadnej kampanii</div>
-            <div class="text-muted" style="font-size:11px;font-style:italic;margin-top:4px;">${escapeHTML(m.note || '')}</div>`;
-        } else {
-          campaignCell = '<span class="text-muted" style="font-size:11px;font-style:italic;">—</span>';
-        }
-        return `
-    <tr class="rules-row" data-rule-id="${escapeHTML(r.id)}">
-      <td class="mono"><strong>${escapeHTML(r.dupSuffix || '—')}</strong></td>
-      <td><span class="pill pill-muted">${escapeHTML(r.matchInTitle || '—')}</span></td>
+  const rows = filtered
+    .map((t) => {
+      const isExpanded = state.expandedTestId === t.id;
+      const ariaPressed = t.active ? 'true' : 'false';
+      return `
+    <tr class="test-row${isExpanded ? ' expanded' : ''}" data-test-id="${escapeHTML(t.id)}" data-test-kind="${t.kind}">
+      <td class="mono"><strong>${escapeHTML(t.dupSuffix || '—')}</strong></td>
+      <td>${typeBadgeHTML(t.testType)}</td>
+      <td>${scopeLabelHTML(t)}</td>
+      <td>${transformationCellHTML(t)}</td>
       <td>
-        <div class="text-dim mono" style="font-size:11px;">${escapeHTML(r.searchInTitle || '')}</div>
-        <div style="font-weight:500;">${escapeHTML(r.replaceWith || '')}</div>
+        <label class="row-toggle" title="${t.active ? 'Aktywny — kliknij żeby spauzować' : 'Spauzowany — kliknij żeby wznowić'}">
+          <input type="checkbox" ${t.active ? 'checked' : ''} aria-pressed="${ariaPressed}" data-toggle-test="${escapeHTML(t.id)}" data-test-kind="${t.kind}" />
+          <span class="row-toggle-slider"></span>
+        </label>
       </td>
-      <td>
-        <span class="pill match-count-badge pill-info" data-mc-rule="${escapeHTML(r.id)}" title="Wczytuję liczbę produktów…">…</span>
-      </td>
-      <td>${campaignCell}</td>
-      <td>
-        <span class="pill ${r.active ? 'pill-success' : 'pill-muted'}" title="${r.active ? 'Test biegnie — żeby spauzować, kliknij wiersz i wybierz „Pauza" w panelu' : 'Test na pauzie — żeby wznowić, kliknij wiersz i wybierz „Wznów" w panelu'}" style="cursor:default;user-select:none;">
-          ${r.active ? 'biegnie' : 'pauza'}
-        </span>
-      </td>
-      <td>
-        <button class="pill pill-info edit-rule-btn" data-edit-rule="${escapeHTML(r.id)}" style="border:none;cursor:pointer;">Edytuj →</button>
+      <td>${winnerPillHTML(t, snapshot)}</td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="eye-btn" data-eye-test="${escapeHTML(t.id)}" title="Podgląd: przed/po (tytuł + opis)">👁</button>
+        ${t.kind === 'rule' ? renderPromoteDropdownHTML(t) : ''}
       </td>
     </tr>
+    ${isExpanded ? renderExpandedRowHTML(t, snapshot) : ''}
   `;
-      }
-    )
+    })
     .join('');
 
-  document.getElementById('rules-table-wrap').innerHTML = `
+  tableWrap.innerHTML = `
     <table class="data-table">
       <thead>
         <tr>
           <th>Kod</th>
+          <th>Typ</th>
           <th>Grupa</th>
-          <th>Co → na co</th>
-          <th>Produktów</th>
-          <th>Kampania docelowa</th>
-          <th>Stan</th>
+          <th>Co podmienia</th>
+          <th style="width:60px;">Stan</th>
+          <th>Wynik</th>
           <th></th>
         </tr>
       </thead>
@@ -370,78 +535,345 @@ async function renderRules() {
     </table>
   `;
 
-  // Wire click handlers
-  document.querySelectorAll('.edit-rule-btn').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openSidePanelEditor(btn.dataset.editRule);
+  wireTestRowHandlers();
+  fetchMatchCounts();
+}
+
+function renderPromoteDropdownHTML(test) {
+  return `
+    <div class="promote-dropdown" data-promote-id="${escapeHTML(test.id)}">
+      <button class="promote-trigger" data-promote-trigger="${escapeHTML(test.id)}" title="Co zrobić z tym testem">
+        <span>Akcje</span><span class="caret">▾</span>
+      </button>
+      <div class="promote-menu">
+        <button class="promote-option" data-promote-action="edit" data-test-id="${escapeHTML(test.id)}">
+          Edytuj test
+          <span class="opt-desc">Otwórz pełny edytor</span>
+        </button>
+        <button class="promote-option" data-promote-action="promote" data-test-id="${escapeHTML(test.id)}">
+          Promuj do main feed
+          <span class="opt-desc">Wynik testu wchodzi do głównego feedu</span>
+        </button>
+        <button class="promote-option" data-promote-action="archive" data-test-id="${escapeHTML(test.id)}">
+          Archiwizuj
+          <span class="opt-desc">Skasuj test (bez powrotu)</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderExpandedRowHTML(test, snapshot) {
+  const mapping = (snapshot?.rules_campaign_mapping || []).find((m) => m.dupSuffix === test.dupSuffix);
+  return `
+    <tr class="test-row-detail">
+      <td colspan="7">
+        <div class="test-row-detail-inner">
+          <div class="test-detail-block">
+            <h4>Zakres testu</h4>
+            <div style="margin-bottom:14px;">
+              ${test.kind === 'image' ? `
+                <div>offerId: <strong>${escapeHTML(test.offerId || '—')}</strong></div>
+                <div>${test.custom_image_url ? 'Custom URL: <span class="mono" style="font-size:11px;">' + escapeHTML(test.custom_image_url) + '</span>' : `Promuje zdjęcie #${test.promote_to_main_index} do MAIN`}</div>
+              ` : `
+                <div>Grupa: ${escapeHTML(test.matchInTitle || '—')} (<span data-mc-rule="${escapeHTML(test.id)}" class="match-count-badge mono">…</span> produktów)</div>
+                <div>Podmiana: <span class="mono" style="font-size:11.5px;">"${escapeHTML(test.searchInTitle || '')}"</span> → <strong>"${escapeHTML(test.replaceWith || '')}"</strong></div>
+                <div>Typ: ${typeBadgeHTML(test.testType)} ${test.testType === 'title' ? '(tylko tytuł)' : test.testType === 'description' ? '(tylko opis — tytuł bez zmian)' : '(tytuł + opis razem)'}</div>
+                ${test.descriptionOverride ? `<div style="margin-top:8px;padding:10px 12px;background:var(--bg);border-radius:6px;font-size:12px;"><div class="text-muted" style="font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px;">Pełny override opisu (${test.descriptionOverride.length}/4950)</div>${escapeHTML(test.descriptionOverride.slice(0, 300))}${test.descriptionOverride.length > 300 ? '…' : ''}</div>` : ''}
+              `}
+            </div>
+            ${test.notes ? `<div style="font-style:italic;color:var(--muted);font-size:12.5px;">„${escapeHTML(test.notes)}"</div>` : ''}
+            <div class="test-detail-actions">
+              <button class="btn btn-secondary" data-promote-action="edit" data-test-id="${escapeHTML(test.id)}" style="padding:7px 13px;font-size:12.5px;">Edytuj w panelu</button>
+              <button class="eye-btn" data-eye-test="${escapeHTML(test.id)}" style="padding:7px 13px;font-size:12.5px;">👁 Podgląd przed/po</button>
+            </div>
+          </div>
+          <div class="test-detail-block">
+            <h4>Kampania docelowa</h4>
+            ${mapping ? `
+              <div style="font-size:13px;line-height:1.55;">
+                <div>${escapeHTML(mapping.target_campaign_name || '—')}</div>
+                ${mapping.target_ad_group ? `<div class="text-muted" style="font-size:12px;font-style:italic;">grupa: ${escapeHTML(mapping.target_ad_group)}</div>` : ''}
+                ${mapping.match_status === 'ready_after_fix' ? '<div style="margin-top:8px;"><span class="pill pill-warning" style="font-size:10.5px;">czeka na fix custom_label_8</span></div>' : ''}
+                ${mapping.match_status === 'needs_ad_group_creation' ? '<div style="margin-top:8px;"><span class="pill pill-error" style="font-size:10.5px;">brak ad-group</span></div>' : ''}
+                ${mapping.note ? `<div class="text-muted" style="font-size:12px;margin-top:6px;">${escapeHTML(mapping.note)}</div>` : ''}
+              </div>
+            ` : '<div class="text-muted" style="font-size:12.5px;font-style:italic;">Brak danych mapowania kampanii — może snapshot się nie wczytał</div>'}
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function wireTestRowHandlers() {
+  // Row click → expand/collapse
+  document.querySelectorAll('.test-row').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      // Don't trigger expand if click was on interactive element
+      if (e.target.closest('.row-toggle, .eye-btn, .promote-dropdown, button, a, input')) return;
+      const id = row.dataset.testId;
+      state.expandedTestId = state.expandedTestId === id ? null : id;
+      renderTestsTable();
     });
   });
-  document.querySelectorAll('.rules-row').forEach((row) => {
-    row.addEventListener('click', () => openSidePanelEditor(row.dataset.ruleId));
-  });
-  // Pill "biegnie/pauza" jest teraz pure display — toggle dostępny tylko
-  // w side-panel (klik wiersza → Pauza/Wznów button). Marcin omyłkowo
-  // kliknął "biegnie" myśląc że to status, więc zabieram inline toggle.
 
-  // Fire match-count fetches in parallel (lightweight — server caches FO feed)
-  rules.forEach((r) => {
+  // Toggle switches
+  document.querySelectorAll('[data-toggle-test]').forEach((input) => {
+    input.addEventListener('click', (e) => e.stopPropagation());
+    input.addEventListener('change', async (e) => {
+      e.stopPropagation();
+      const id = input.dataset.toggleTest;
+      const kind = input.dataset.testKind;
+      const desired = input.checked;
+      input.disabled = true;
+      try {
+        const endpoint = kind === 'image' ? '/api/image-rules/' + encodeURIComponent(id) : '/api/rules/' + encodeURIComponent(id);
+        const r = await fetch(endpoint, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'set_active', active: desired }),
+        });
+        const j = await r.json();
+        if (r.ok || r.status === 202) {
+          showSaveSuccess(`${id} ${desired ? 'wznowiony' : 'spauzowany'}`, j);
+          await reloadConfig();
+          renderTestsTable();
+        } else if (r.status === 403 && j.fix) {
+          input.checked = !desired;
+          showToast(format403Help(j), 'error');
+        } else {
+          input.checked = !desired;
+          showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
+        }
+      } catch (err) {
+        input.checked = !desired;
+        showToast('Błąd sieci: ' + escapeHTML(err.message), 'error');
+      } finally {
+        input.disabled = false;
+      }
+    });
+  });
+
+  // Eye preview
+  document.querySelectorAll('[data-eye-test]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEyePreview(btn.dataset.eyeTest);
+    });
+  });
+
+  // Promote dropdowns
+  document.querySelectorAll('[data-promote-trigger]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = btn.closest('.promote-dropdown');
+      const wasOpen = dropdown.classList.contains('open');
+      document.querySelectorAll('.promote-dropdown.open').forEach((d) => d.classList.remove('open'));
+      if (!wasOpen) dropdown.classList.add('open');
+    });
+  });
+
+  // Promote options
+  document.querySelectorAll('[data-promote-action]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const action = btn.dataset.promoteAction;
+      const testId = btn.dataset.testId;
+      document.querySelectorAll('.promote-dropdown.open').forEach((d) => d.classList.remove('open'));
+
+      if (action === 'edit') {
+        openSidePanelEditor(testId);
+      } else if (action === 'archive') {
+        if (!confirm(`Skasować test „${testId}"? Tego nie cofniesz inline — tylko git revert.`)) return;
+        const tests = unifyTests(state.config);
+        const test = tests.find((t) => t.id === testId);
+        try {
+          const endpoint = test?.kind === 'image' ? '/api/image-rules/' + encodeURIComponent(testId) : '/api/rules/' + encodeURIComponent(testId);
+          const r = await fetch(endpoint, { method: 'DELETE' });
+          const j = await r.json();
+          if (r.ok || r.status === 202) {
+            showSaveSuccess(`Test ${testId} usunięty`, j);
+            await reloadConfig();
+            renderTestsTable();
+          } else if (r.status === 403 && j.fix) {
+            showToast(format403Help(j), 'error');
+          } else {
+            showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
+          }
+        } catch (err) {
+          showToast('Błąd sieci: ' + escapeHTML(err.message), 'error');
+        }
+      } else if (action === 'promote') {
+        showToast('Promocja do main feed — wymaga ręcznego scalenia w głównym feedzie Room99 w Feed Optimise. Dopisz wariant do oryginalnego tytułu produktu, a potem skasuj ten test.', 'warning');
+      }
+    });
+  });
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.promote-dropdown')) {
+      document.querySelectorAll('.promote-dropdown.open').forEach((d) => d.classList.remove('open'));
+    }
+  });
+}
+
+function fetchMatchCounts() {
+  const tests = unifyTests(state.config).filter((t) => t.kind === 'rule');
+  tests.forEach((t) => {
+    if (state.matchCounts[t.id] !== undefined) {
+      updateMatchCountUI(t.id, state.matchCounts[t.id]);
+      return;
+    }
     fetch('/api/rule-impact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchInTitle: r.matchInTitle }),
+      body: JSON.stringify({ matchInTitle: t.matchInTitle }),
     })
       .then((res) => res.json())
       .then((data) => {
-        const el = document.querySelector(`[data-mc-rule="${CSS.escape(r.id)}"]`);
-        if (el && data.matched_count !== undefined) {
-          el.textContent = data.matched_count.toString();
-          el.title = `${data.matched_count} produktów matchuje "${r.matchInTitle}" w aktywnym feedzie`;
-          if (data.matched_count === 0) el.className = 'pill match-count-badge pill-warning';
+        if (data.matched_count !== undefined) {
+          state.matchCounts[t.id] = data.matched_count;
+          updateMatchCountUI(t.id, data.matched_count);
         }
       })
-      .catch(() => {
-        const el = document.querySelector(`[data-mc-rule="${CSS.escape(r.id)}"]`);
-        if (el) {
-          el.textContent = '—';
-          el.className = 'pill match-count-badge pill-muted';
-        }
-      });
+      .catch(() => updateMatchCountUI(t.id, '—'));
   });
 }
 
-async function reloadConfig() {
+function updateMatchCountUI(testId, count) {
+  const el = document.querySelector(`[data-mc-rule="${CSS.escape(testId)}"]`);
+  if (el) {
+    el.textContent = count;
+    if (count === 0) el.style.color = 'var(--warning)';
+  }
+}
+
+// ====================================================================
+// EYE PREVIEW MODAL
+// ====================================================================
+
+async function openEyePreview(testId) {
+  const tests = unifyTests(state.config);
+  const test = tests.find((t) => t.id === testId);
+  if (!test) return;
+
+  // Build or find modal
+  let backdrop = document.getElementById('preview-modal-backdrop');
+  let modal = document.getElementById('preview-modal');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.className = 'preview-modal-backdrop';
+    backdrop.id = 'preview-modal-backdrop';
+    document.body.appendChild(backdrop);
+    backdrop.addEventListener('click', closeEyePreview);
+  }
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'preview-modal';
+    modal.id = 'preview-modal';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="card-header" style="margin-bottom:8px;">
+      <div>
+        <div class="card-title">Podgląd: przed / po</div>
+        <div class="card-sub">Test ${escapeHTML(test.dupSuffix || test.id)} — pokazuję pierwszy pasujący produkt</div>
+      </div>
+      <button class="btn btn-secondary" id="preview-close" style="padding:7px 14px;">Zamknij</button>
+    </div>
+    <div id="preview-body">
+      <div class="loading">Ładuję przykładowy produkt z feedu…</div>
+    </div>
+  `;
+  backdrop.classList.add('show');
+  modal.classList.add('show');
+  document.getElementById('preview-close').addEventListener('click', closeEyePreview);
+
+  // Fetch a sample product matching the test's group
   try {
-    const data = await fetchJSON('/api/config');
-    state.config = data.config;
-    state.configSha = data.sha;
-    state.configError = null;
+    let sampleProduct;
+    if (test.kind === 'image') {
+      const data = await fetchJSON('/api/products?id=' + encodeURIComponent(test.offerId));
+      sampleProduct = data.products[0];
+    } else {
+      // Search by matchInTitle keyword
+      const q = encodeURIComponent(test.matchInTitle || '');
+      const data = await fetchJSON('/api/products?q=' + q + '&perPage=1');
+      sampleProduct = data.products[0];
+    }
+    if (!sampleProduct) {
+      document.getElementById('preview-body').innerHTML =
+        '<div class="alert warning show">Nie znalazłem produktu pasującego do tego testu w feedzie.</div>';
+      return;
+    }
+    renderEyePreviewContent(test, sampleProduct);
   } catch (e) {
-    state.configError = e.message;
+    document.getElementById('preview-body').innerHTML =
+      `<div class="alert error show">Błąd: ${escapeHTML(e.message)}</div>`;
   }
 }
 
-// ---------- TOAST ----------
-function showToast(message, type) {
-  let container = document.getElementById('toast-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'toast-container';
-    container.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px;';
-    document.body.appendChild(container);
-  }
-  const toast = document.createElement('div');
-  toast.className = 'alert show ' + (type || 'success');
-  toast.style.cssText = 'min-width:280px;max-width:420px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
-  toast.innerHTML = message;
-  container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 4500);
-  setTimeout(() => toast.remove(), 5000);
+function closeEyePreview() {
+  document.getElementById('preview-modal-backdrop')?.classList.remove('show');
+  document.getElementById('preview-modal')?.classList.remove('show');
 }
 
-// ---------- SIDE-PANEL EDITOR ----------
+function renderEyePreviewContent(test, product) {
+  const beforeTitle = product.title || '';
+  const beforeDesc = product.description || '';
+
+  let afterTitle = beforeTitle;
+  let afterDesc = beforeDesc;
+
+  if (test.kind === 'rule') {
+    const searchRegex = test.searchInTitle ? new RegExp(test.searchInTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+    if ((test.testType === 'title' || test.testType === 'both') && searchRegex && test.replaceWith) {
+      afterTitle = wordCapitalize(beforeTitle.replace(searchRegex, test.replaceWith));
+    }
+    if ((test.testType === 'description' || test.testType === 'both')) {
+      if (test.descriptionOverride && test.descriptionOverride.trim()) {
+        afterDesc = test.descriptionOverride.slice(0, 4950);
+      } else if (searchRegex && test.replaceWith) {
+        afterDesc = beforeDesc.replace(new RegExp(test.searchInTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), test.replaceWith).slice(0, 4950);
+      }
+    }
+  }
+
+  const titleChanged = afterTitle !== beforeTitle;
+  const descChanged = afterDesc !== beforeDesc;
+
+  document.getElementById('preview-body').innerHTML = `
+    <div class="text-muted" style="font-size:12px;margin-bottom:14px;">
+      Produkt: <span class="mono">${escapeHTML(product.id)}</span> · ${escapeHTML(product.product_type || '—')}
+    </div>
+    <div class="preview-side-by-side">
+      <div class="preview-col">
+        <div class="preview-col-label">Oryginał (parent)</div>
+        <div class="preview-title">${escapeHTML(beforeTitle)}</div>
+        <div class="preview-desc">${escapeHTML(beforeDesc) || '<em style="color:var(--muted);">brak opisu</em>'}</div>
+      </div>
+      <div class="preview-col is-variant">
+        <div class="preview-col-label">Wariant (${escapeHTML(test.dupSuffix)})</div>
+        <div class="preview-title" style="${titleChanged ? 'color:var(--primary);' : ''}">${escapeHTML(afterTitle)}</div>
+        <div class="preview-desc" style="${descChanged ? 'background:var(--primary-soft);padding:8px;border-radius:6px;' : ''}">${escapeHTML(afterDesc) || '<em style="color:var(--muted);">brak opisu</em>'}</div>
+      </div>
+    </div>
+    ${test.kind === 'image' ? `
+      <div style="margin-top:18px;padding:12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text-dim);">
+        ⓘ Test typu „obraz" podmienia tylko <code>image_link</code>. Tytuł i opis pozostają identyczne — zmianę zobaczysz w panelu Zdjęcia lub na liście kafelków.
+      </div>
+    ` : ''}
+  `;
+}
+
+// ====================================================================
+// SIDE-PANEL (editor) — extended with testType + description
+// ====================================================================
 const sp = {
   current: null,
+  original: null,
   debounceTimer: null,
 };
 
@@ -449,21 +881,41 @@ function openSidePanelEditor(ruleId) {
   const rules = state.config?.duplicateRules || [];
   const rule = rules.find((r) => r.id === ruleId);
   if (!rule) {
-    showToast('Reguła nie znaleziona', 'error');
+    // Maybe it's an image rule
+    const imageRules = state.config?.imageRules || [];
+    const imgRule = imageRules.find((r) => r.id === ruleId);
+    if (imgRule) {
+      showToast('Edycja reguł obrazka (na razie) tylko w GitHubie. Open in GitHub →', 'warning');
+      return;
+    }
+    showToast('Test nie znaleziony', 'error');
     return;
   }
-  sp.current = JSON.parse(JSON.stringify(rule)); // working copy
+  sp.current = JSON.parse(JSON.stringify(rule));
   sp.original = JSON.parse(JSON.stringify(rule));
+
+  // Apply default testType for legacy rules
+  if (!sp.current.testType) sp.current.testType = 'title';
 
   document.getElementById('sp-rule-id').textContent = rule.id;
   document.getElementById('sp-rule-status').innerHTML =
     `<span class="mono">${escapeHTML(rule.dupSuffix || '')}</span> · ${rule.active
-      ? '<span class="pill pill-success">active</span>'
-      : '<span class="pill pill-muted">inactive</span>'} · created ${escapeHTML((rule.created_at || '').substring(0, 10) || '—')}${rule.updated_at ? ' · last edit ' + escapeHTML(rule.updated_at.substring(0, 10)) : ''}`;
+      ? '<span class="pill pill-success">biegnie</span>'
+      : '<span class="pill pill-muted">pauza</span>'} · utworzony ${escapeHTML((rule.created_at || '').substring(0, 10) || '—')}${rule.updated_at ? ' · edytowany ' + escapeHTML(rule.updated_at.substring(0, 10)) : ''}`;
 
-  ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes'].forEach((field) => {
-    document.getElementById('sp-' + field).value = rule[field] || '';
+  // Set radio
+  document.querySelectorAll('input[name="sp-testType"]').forEach((r) => {
+    r.checked = r.value === sp.current.testType;
   });
+
+  // Set field values
+  ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes', 'descriptionOverride'].forEach((field) => {
+    const el = document.getElementById('sp-' + field);
+    if (el) el.value = rule[field] || '';
+  });
+
+  updateDescOverrideVisibility();
+  updateDescCounter();
 
   document.getElementById('side-panel').classList.add('show');
   document.getElementById('side-panel-backdrop').classList.add('show');
@@ -487,17 +939,41 @@ function bindSidePanelHandlers() {
   _sidePanelBound = true;
 
   document.getElementById('sp-close').addEventListener('click', closeSidePanel);
-  document.getElementById('side-panel-backdrop').addEventListener('click', closeSidePanel);
+  document.getElementById('side-panel-backdrop').addEventListener('click', (e) => {
+    // Only close if backdrop itself was clicked (not the add panel)
+    if (e.target.id === 'side-panel-backdrop') {
+      closeSidePanel();
+      closeAddPanel();
+    }
+  });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.getElementById('side-panel').classList.contains('show')) closeSidePanel();
+    if (e.key === 'Escape') {
+      if (document.getElementById('side-panel')?.classList.contains('show')) closeSidePanel();
+      if (document.getElementById('add-panel')?.classList.contains('show')) closeAddPanel();
+      if (document.getElementById('preview-modal')?.classList.contains('show')) closeEyePreview();
+    }
   });
 
-  // Field change → update working copy + debounce impact check + update preview
-  ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes'].forEach((field) => {
-    document.getElementById('sp-' + field).addEventListener('input', (e) => {
+  // testType radios
+  document.querySelectorAll('input[name="sp-testType"]').forEach((radio) => {
+    radio.addEventListener('change', (e) => {
+      if (!sp.current) return;
+      sp.current.testType = e.target.value;
+      updateDescOverrideVisibility();
+      updateDiff();
+      runImpactCheck();
+    });
+  });
+
+  // Field input handlers
+  ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes', 'descriptionOverride'].forEach((field) => {
+    const el = document.getElementById('sp-' + field);
+    if (!el) return;
+    el.addEventListener('input', (e) => {
       if (!sp.current) return;
       sp.current[field] = e.target.value;
-      updateReplacePreview();
+      if (field === 'replaceWith') updateReplacePreview();
+      if (field === 'descriptionOverride') updateDescCounter();
       updateDiff();
       if (['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix'].includes(field)) {
         clearTimeout(sp.debounceTimer);
@@ -511,7 +987,22 @@ function bindSidePanelHandlers() {
   document.getElementById('sp-delete').addEventListener('click', deleteSidePanelRule);
 }
 
+function updateDescOverrideVisibility() {
+  const field = document.getElementById('sp-desc-override-field');
+  if (!field || !sp.current) return;
+  field.style.display = (sp.current.testType === 'description' || sp.current.testType === 'both') ? 'block' : 'none';
+}
+
+function updateDescCounter() {
+  const el = document.getElementById('sp-descriptionOverride');
+  const counter = document.getElementById('sp-desc-counter');
+  if (!el || !counter) return;
+  counter.textContent = `${el.value.length} / 4950`;
+  counter.style.color = el.value.length > 4500 ? 'var(--warning)' : 'var(--muted)';
+}
+
 function updateReplacePreview() {
+  if (!sp.current) return;
   const raw = (sp.current.replaceWith || '').trim();
   const el = document.getElementById('sp-replace-preview');
   if (!raw) { el.textContent = '—'; el.style.color = 'var(--muted)'; return; }
@@ -521,17 +1012,16 @@ function updateReplacePreview() {
 }
 
 function updateDiff() {
-  const orig = sp.original;
-  const cur = sp.current;
-  const fields = ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes'];
+  if (!sp.original || !sp.current) return;
+  const fields = ['testType', 'matchInTitle', 'searchInTitle', 'replaceWith', 'descriptionOverride', 'dupSuffix', 'notes'];
   const diff = {};
   for (const f of fields) {
-    if ((orig[f] || '') !== (cur[f] || '')) {
-      diff[f] = { before: orig[f] || '', after: cur[f] || '' };
+    if ((sp.original[f] || '') !== (sp.current[f] || '')) {
+      diff[f] = { before: sp.original[f] || '', after: sp.current[f] || '' };
     }
   }
-  document.getElementById('sp-diff').textContent =
-    Object.keys(diff).length === 0 ? 'No changes yet' : JSON.stringify(diff, null, 2);
+  const diffEl = document.getElementById('sp-diff');
+  if (diffEl) diffEl.textContent = Object.keys(diff).length === 0 ? 'Brak zmian' : JSON.stringify(diff, null, 2);
 }
 
 async function runImpactCheck() {
@@ -563,8 +1053,24 @@ async function runImpactCheck() {
     return;
   }
 
-  // Banner
-  const errorsCount = (data.validators || []).filter((v) => v.level === 'error').length;
+  // Add testType-specific validators
+  const validators = [...(data.validators || [])];
+  if ((sp.current.testType === 'description' || sp.current.testType === 'both')) {
+    if (!sp.current.descriptionOverride && (!sp.current.searchInTitle || !sp.current.replaceWith)) {
+      validators.push({
+        level: 'error',
+        message: 'Test typu „Opis" wymaga albo wypełnionego pola „Co podmienić" + „Czym to podmienić", albo pełnego override opisu.',
+      });
+    }
+  }
+  if (sp.current.descriptionOverride && sp.current.descriptionOverride.length > 4950) {
+    validators.push({
+      level: 'error',
+      message: `Override opisu ma ${sp.current.descriptionOverride.length} znaków — limit Google PLA to 5000 (utrzymujemy 4950 dla bezpieczeństwa).`,
+    });
+  }
+
+  const errorsCount = validators.filter((v) => v.level === 'error').length;
   const bannerLevel = errorsCount > 0 ? 'error' : (data.matched_count === 0 ? 'warning' : 'success');
   document.getElementById('sp-impact-banner').innerHTML = `
     <div class="alert show ${bannerLevel}">
@@ -573,12 +1079,11 @@ async function runImpactCheck() {
     </div>
   `;
 
-  // Validators
   const vl = document.getElementById('sp-validators');
-  if (!data.validators || data.validators.length === 0) {
+  if (!validators || validators.length === 0) {
     vl.innerHTML = '<div class="text-muted" style="font-size:12px;">Wszystko OK — żadnych ostrzeżeń</div>';
   } else {
-    vl.innerHTML = data.validators
+    vl.innerHTML = validators
       .map(
         (v) => `
       <div class="validator-item ${escapeHTML(v.level)}">
@@ -590,53 +1095,39 @@ async function runImpactCheck() {
       .join('');
   }
 
-  // Samples
+  // Samples — include description preview when testType requires
   const sc = document.getElementById('sp-sample-count');
-  sc.textContent = `pokazuję ${data.samples?.length || 0} z ${data.matched_count}`;
+  if (sc) sc.textContent = `pokazuję ${data.samples?.length || 0} z ${data.matched_count}`;
   const sa = document.getElementById('sp-samples');
   if (!data.samples || data.samples.length === 0) {
     sa.innerHTML = '<div class="text-muted" style="font-size:12px;">Brak matched products</div>';
   } else {
     sa.innerHTML = data.samples
-      .map(
-        (s) => `
+      .map((s) => {
+        const showDesc = sp.current.testType === 'description' || sp.current.testType === 'both';
+        return `
       <div class="sample-preview">
         <div class="sample-id">id ${escapeHTML(s.id)}</div>
-        <div class="sample-before">${escapeHTML(s.before)}</div>
-        <div class="sample-after">→ ${escapeHTML(s.after)}</div>
+        ${sp.current.testType !== 'description' ? `
+          <div class="sample-before">${escapeHTML(s.before)}</div>
+          <div class="sample-after">→ ${escapeHTML(s.after)}</div>
+        ` : `<div style="font-size:12.5px;font-weight:500;">${escapeHTML(s.before)}</div>
+             <div class="text-muted" style="font-size:11px;font-style:italic;margin-top:4px;">(tytuł bez zmian — test typu Opis)</div>`}
       </div>
-    `
-      )
+    `;
+      })
       .join('');
   }
 
-  // Disable save if any error
   document.getElementById('sp-save').disabled = errorsCount > 0;
-  document.getElementById('sp-save').title = errorsCount > 0 ? 'Resolve errors first' : '';
-}
-
-function format403Help(j) {
-  if (!j.fix) return escapeHTML(j.error || 'unknown');
-  return `
-    <strong>${escapeHTML(j.error)}</strong><br>
-    <details style="margin-top:8px;">
-      <summary style="cursor:pointer;font-weight:600;">Jak naprawić (krok po kroku) ▾</summary>
-      <ol style="margin:6px 0 0 18px;font-size:12px;line-height:1.6;">
-        <li><a href="${escapeHTML(j.fix.step_1.split(': ')[1])}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Generate fine-grained PAT →</a></li>
-        <li>${escapeHTML(j.fix.step_2)}</li>
-        <li>${escapeHTML(j.fix.step_3)}</li>
-        <li><a href="${escapeHTML(j.fix.step_4.split(': ')[1])}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Update GITHUB_TOKEN in Vercel →</a></li>
-        <li>${escapeHTML(j.fix.step_5)}</li>
-      </ol>
-    </details>
-  `;
+  document.getElementById('sp-save').title = errorsCount > 0 ? 'Usuń błędy żeby zapisać' : '';
 }
 
 async function saveSidePanelChanges() {
   if (!sp.current) return;
   const id = sp.original.id;
   const changes = {};
-  for (const f of ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes']) {
+  for (const f of ['testType', 'matchInTitle', 'searchInTitle', 'replaceWith', 'descriptionOverride', 'dupSuffix', 'notes']) {
     if ((sp.original[f] || '') !== (sp.current[f] || '')) {
       changes[f] = sp.current[f];
     }
@@ -659,33 +1150,21 @@ async function saveSidePanelChanges() {
       showSaveSuccess(`Reguła ${id} zapisana`, j);
       closeSidePanel();
       await reloadConfig();
-      renderRules();
+      renderTestsTable();
     } else if (r.status === 403 && j.fix) {
       showToast(format403Help(j), 'error');
       btn.disabled = false;
-      btn.textContent = 'Zapisz';
+      btn.textContent = 'Zapisz zmiany';
     } else {
       showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
       btn.disabled = false;
-      btn.textContent = 'Zapisz';
+      btn.textContent = 'Zapisz zmiany';
     }
   } catch (e) {
     showToast('Błąd sieci: ' + escapeHTML(e.message), 'error');
     btn.disabled = false;
-    btn.textContent = 'Zapisz';
+    btn.textContent = 'Zapisz zmiany';
   }
-}
-
-// Unified success toast — łagodny, ludzki ton bez technicznego żargonu
-function showSaveSuccess(action, j) {
-  const where = j.method === 'issue_fallback'
-    ? 'zapisałem w bezpiecznej kolejce, sklep się zaktualizuje w ciągu minuty'
-    : 'sklep zaktualizuje się w ciągu kilku minut';
-  const link = j.commit_url || j.issue_url || '#';
-  showToast(
-    `✓ ${escapeHTML(action)} — ${where}. <a href="${escapeHTML(link)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">zobacz szczegóły →</a>`,
-    'success'
-  );
 }
 
 async function toggleSidePanelRule() {
@@ -702,7 +1181,7 @@ async function toggleSidePanelRule() {
       showSaveSuccess(`${id} toggled`, j);
       closeSidePanel();
       await reloadConfig();
-      renderRules();
+      renderTestsTable();
     } else if (r.status === 403 && j.fix) {
       showToast(format403Help(j), 'error');
     } else {
@@ -716,17 +1195,15 @@ async function toggleSidePanelRule() {
 async function deleteSidePanelRule() {
   if (!sp.original) return;
   const id = sp.original.id;
-  if (!confirm(`Usunąć regułę "${id}"? Tego nie można cofnąć inline — tylko git revert.`)) return;
+  if (!confirm(`Skasować test „${id}"? Tego nie cofniesz inline — tylko git revert.`)) return;
   try {
-    const r = await fetch('/api/rules/' + encodeURIComponent(id), {
-      method: 'DELETE',
-    });
+    const r = await fetch('/api/rules/' + encodeURIComponent(id), { method: 'DELETE' });
     const j = await r.json();
     if (r.ok || r.status === 202) {
-      showSaveSuccess(`Reguła ${id} usunięta`, j);
+      showSaveSuccess(`Test ${id} usunięty`, j);
       closeSidePanel();
       await reloadConfig();
-      renderRules();
+      renderTestsTable();
     } else if (r.status === 403 && j.fix) {
       showToast(format403Help(j), 'error');
     } else {
@@ -737,10 +1214,428 @@ async function deleteSidePanelRule() {
   }
 }
 
+// ====================================================================
+// ADD PANEL (slides from right, separate from edit)
+// ====================================================================
+let _addPanelBound = false;
+
+function openAddPanel() {
+  // Reset form
+  document.getElementById('add-test-form').reset();
+  document.querySelectorAll('input[name="add-testType"]').forEach((r) => { r.checked = r.value === 'title'; });
+  updateAddDescVisibility();
+  updateAddDescCounter();
+  document.getElementById('add-replace-preview').textContent = '—';
+  document.getElementById('add-alert').className = 'alert';
+
+  document.getElementById('add-panel').classList.add('show');
+  document.getElementById('side-panel-backdrop').classList.add('show');
+  document.getElementById('add-panel').setAttribute('aria-hidden', 'false');
+
+  bindAddPanelHandlers();
+}
+
+function closeAddPanel() {
+  document.getElementById('add-panel')?.classList.remove('show');
+  document.getElementById('add-panel')?.setAttribute('aria-hidden', 'true');
+  // Only close backdrop if side panel also not open
+  if (!document.getElementById('side-panel')?.classList.contains('show')) {
+    document.getElementById('side-panel-backdrop')?.classList.remove('show');
+  }
+}
+
+function bindAddPanelHandlers() {
+  if (_addPanelBound) return;
+  _addPanelBound = true;
+
+  document.getElementById('add-close').addEventListener('click', closeAddPanel);
+  document.getElementById('add-cancel').addEventListener('click', closeAddPanel);
+
+  document.querySelectorAll('input[name="add-testType"]').forEach((radio) => {
+    radio.addEventListener('change', updateAddDescVisibility);
+  });
+
+  const replaceInput = document.getElementById('add-replaceWith');
+  const replacePreview = document.getElementById('add-replace-preview');
+  replaceInput.addEventListener('input', () => {
+    const raw = replaceInput.value.trim();
+    if (!raw) {
+      replacePreview.textContent = '—';
+      replacePreview.style.color = 'var(--muted)';
+      return;
+    }
+    const normalized = wordCapitalize(raw);
+    replacePreview.textContent = normalized;
+    replacePreview.style.color = raw === normalized ? 'var(--success)' : 'var(--warning)';
+  });
+
+  document.getElementById('add-descriptionOverride').addEventListener('input', updateAddDescCounter);
+
+  document.getElementById('add-test-form').addEventListener('submit', submitAddTest);
+}
+
+function updateAddDescVisibility() {
+  const checked = document.querySelector('input[name="add-testType"]:checked')?.value || 'title';
+  const field = document.getElementById('add-desc-override-field');
+  if (field) field.style.display = (checked === 'description' || checked === 'both') ? 'block' : 'none';
+}
+
+function updateAddDescCounter() {
+  const el = document.getElementById('add-descriptionOverride');
+  const counter = document.getElementById('add-desc-counter');
+  if (!el || !counter) return;
+  counter.textContent = `${el.value.length} / 4950`;
+  counter.style.color = el.value.length > 4500 ? 'var(--warning)' : 'var(--muted)';
+}
+
+async function submitAddTest(e) {
+  e.preventDefault();
+  const btn = document.getElementById('add-submit');
+  const alertEl = document.getElementById('add-alert');
+  btn.disabled = true;
+  btn.textContent = 'Dodaję…';
+  alertEl.className = 'alert';
+
+  const data = {
+    testType: document.querySelector('input[name="add-testType"]:checked')?.value || 'title',
+    matchInTitle: document.getElementById('add-matchInTitle').value.trim(),
+    searchInTitle: document.getElementById('add-searchInTitle').value.trim(),
+    replaceWith: document.getElementById('add-replaceWith').value.trim(),
+    descriptionOverride: document.getElementById('add-descriptionOverride').value.trim() || null,
+    dupSuffix: document.getElementById('add-dupSuffix').value.trim(),
+    notes: document.getElementById('add-notes').value.trim(),
+  };
+
+  try {
+    const r = await fetch('/api/add-variant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const j = await r.json();
+    if (r.ok) {
+      alertEl.innerHTML = `✓ Dodałem Twój nowy test. Wjedzie do sklepu w ciągu godziny. <a href="${escapeHTML(j.url || '#')}" target="_blank" rel="noopener">zobacz szczegóły →</a>`;
+      alertEl.className = 'alert show success';
+      setTimeout(async () => {
+        closeAddPanel();
+        await reloadConfig();
+        renderTestsTable();
+      }, 1800);
+    } else {
+      alertEl.innerHTML = 'Coś nie wyszło: ' + escapeHTML(j.error || 'nieznany powód') + '. Spróbuj jeszcze raz.';
+      alertEl.className = 'alert show error';
+    }
+  } catch (err) {
+    alertEl.innerHTML = 'Sieć nie odpowiada: ' + escapeHTML(err.message);
+    alertEl.className = 'alert show error';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Dodaj test';
+  }
+}
+
+// Make openAddPanel globally available for inline onclick in decisions feed
+window.openAddPanel = openAddPanel;
+
+// ====================================================================
+// IDEAS (hypotheses + add CTA)
+// ====================================================================
+async function renderIdeas() {
+  await ensureCoreLoaded();
+  await ensurePerformanceSnapshotLoaded();
+
+  const content = document.getElementById('ideas-content');
+  const subtitle = document.getElementById('ideas-subtitle');
+
+  const rules = state.config?.duplicateRules || [];
+  const snapshot = state.perfSnapshot;
+  const hypotheses = buildHypotheses(rules, snapshot);
+
+  const counts = {
+    critical: hypotheses.filter((h) => h.priority === 'critical').length,
+    high: hypotheses.filter((h) => h.priority === 'high').length,
+    medium: hypotheses.filter((h) => h.priority === 'medium').length,
+    low: hypotheses.filter((h) => h.priority === 'low').length,
+  };
+  const parts = [];
+  if (counts.critical) parts.push(`<span style="color:var(--error);">${counts.critical} pilne</span>`);
+  if (counts.high) parts.push(`<span style="color:var(--warning);">${counts.high} ważne</span>`);
+  if (counts.medium) parts.push(`${counts.medium} warto rozważyć`);
+  if (counts.low) parts.push(`${counts.low} drobnostek`);
+  subtitle.innerHTML = parts.length ? parts.join(' · ') : 'Wszystko gra — nic do roboty';
+
+  // Always include CTA card at top
+  let html = `
+    <div class="card mb-2" style="border-left:3px solid var(--primary);">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Masz pomysł na nowy test?</div>
+          <div class="card-sub">Tytuł, opis, albo jedno i drugie — wjedzie do sklepu w ciągu godziny</div>
+        </div>
+        <button class="btn" onclick="openAddPanel()" style="padding:9px 16px;">+ Nowy test</button>
+      </div>
+    </div>
+  `;
+
+  if (hypotheses.length === 0) {
+    html += '<div class="placeholder"><div class="placeholder-title">Brak hipotez — system w stabilnym stanie</div></div>';
+  } else {
+    html += hypotheses
+      .map((h) => {
+        const priorityColor = { critical: 'error', high: 'warning', medium: 'info', low: 'muted' }[h.priority] || 'muted';
+        return `
+      <div class="card mb-2" style="border-left:3px solid var(--${h.priority === 'critical' ? 'error' : h.priority === 'high' ? 'warning' : 'primary'});">
+        <div class="card-header">
+          <div>
+            <div class="card-title">${h.icon || '◆'} ${escapeHTML(h.title)}</div>
+            <div class="card-sub">${escapeHTML(h.source)}</div>
+          </div>
+          <span class="pill pill-${priorityColor}">${escapeHTML(h.priority)}</span>
+        </div>
+        <div style="font-size:13px;line-height:1.6;color:var(--text-dim);">${h.detail}</div>
+        ${h.action ? `<div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:6px;font-size:12px;"><strong>Sugerowana akcja:</strong> ${h.action}</div>` : ''}
+        ${h.evidence ? `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:11px;color:var(--muted);">Evidence ▾</summary><ul style="margin:6px 0 0 18px;font-size:11px;color:var(--text-dim);">${h.evidence.map((e) => `<li>${escapeHTML(e)}</li>`).join('')}</ul></details>` : ''}
+      </div>
+    `;
+      })
+      .join('');
+  }
+
+  content.innerHTML = html;
+}
+
+function buildHypotheses(rules, snapshot) {
+  const out = [];
+
+  if (snapshot?.duplicate_diagnosis?.status === 'critical') {
+    const d = snapshot.duplicate_diagnosis;
+    const fix = d.fix_proposal || {};
+    const detail = fix.preserves
+      ? `<strong>Dlaczego tak się dzieje:</strong><br>${(d.evidence || []).slice(0,2).map((e) => '• ' + escapeHTML(e)).join('<br>')}<br><br><strong>Jak to naprawić:</strong> ${escapeHTML(fix.name || '')}.<br>${escapeHTML(fix.preserves || '')}<br><br><strong>Czego się spodziewać:</strong> ${escapeHTML(fix.expected_outcome_week1 || '')}`
+      : `<strong>Dlaczego tak się dzieje:</strong> ${escapeHTML(d.evidence?.[0] || '—')}`;
+    out.push({
+      priority: 'critical',
+      icon: '!',
+      title: d.headline || 'Twój test tytułów nie zbiera danych',
+      source: 'Confirmed przez analizę Twoich kampanii (custom_label_8 ad-group filters)',
+      detail,
+      action: fix.caveat_t6_t7 ? `Powiedz mi „naprawiaj" — przygotowałem już pre-flight diff. <br><br><em>Uwaga: ${escapeHTML(fix.caveat_t6_t7)}</em>` : 'Powiedz mi „naprawiaj" — pre-flight diff gotowy.',
+      evidence: d.evidence,
+    });
+  }
+
+  for (const t of (snapshot?.proposed_new_tests || []).slice(0, 5)) {
+    const priority = t.priority_score >= 9 ? 'high' : t.priority_score >= 7 ? 'medium' : 'low';
+    out.push({
+      priority,
+      icon: '+',
+      title: `Spróbuj: „${escapeHTML(t.title_proposed)}"`,
+      source: `Z danych GSC + Google Ads + GA4 · grupa „${escapeHTML(t.match_group)}" · ${t.products_in_scope} produktów`,
+      detail: escapeHTML(t.evidence),
+      action: `Spodziewany wpływ: <strong>+${t.expected_revenue_pln_per_month?.toLocaleString('pl-PL')} zł/mc przychodu</strong>${t.campaign_target ? ` · wpadnie do: ${escapeHTML(t.campaign_target)}` : ''}<br><br><button class="btn" onclick="openAddPanel()" style="padding:6px 12px;font-size:12px;margin-top:6px;">+ Dodaj jako test</button>`,
+    });
+  }
+
+  for (const c of snapshot?.underperforming_campaigns || []) {
+    out.push({
+      priority: 'high',
+      icon: '↓',
+      title: `Kampania „${c.name}" oddaje budżet niewspółmiernie do przychodu`,
+      source: 'Z danych z Twoich kampanii, ostatni miesiąc',
+      detail: escapeHTML(c.alert),
+      action: 'Spauzuj tę kampanię. Jeśli to świadoma kampania pozyskująca nowych klientów — sprawdź inne wskaźniki niż zwrot (np. koszt pozyskania klienta).',
+    });
+  }
+
+  for (const w of snapshot?.winner_campaigns?.slice(0, 1) || []) {
+    out.push({
+      priority: 'medium',
+      icon: '★',
+      title: `Skopiuj sposób, w jaki działa „${w.name}"`,
+      source: 'Najlepsza Twoja kampania, ostatni miesiąc',
+      detail: escapeHTML(w.note),
+      action: 'Spójrz, jak ta kampania ma ustawione bidy, grupy assetów i cele ROAS. Zastosuj to samo w pozostałych PMax-ach.',
+    });
+  }
+
+  const activeRules = rules.filter((r) => r.active);
+  const inactive = rules.filter((r) => !r.active);
+
+  if (inactive.length > 0) {
+    out.push({
+      priority: 'low',
+      icon: '◦',
+      title: `Masz ${inactive.length} ${inactive.length === 1 ? 'wyłączony test' : 'wyłączone testy'} — może warto sprzątnąć`,
+      source: 'Z Twojej listy testów',
+      detail: `Testy: ${inactive.map((r) => escapeHTML(r.dupSuffix || r.id)).join(', ')}. Nie generują wariantów, ale wciąż są na liście.`,
+      action: 'Skasuj jeśli wiesz, że już do nich nie wrócisz. Zostaw jeśli to reference do tytułów które weszły do głównego feedu.',
+    });
+  }
+
+  const capsViolations = activeRules.filter((r) => /[A-ZĄĆĘŁŃÓŚŹŻ]{3,}/.test(r.replaceWith || ''));
+  if (capsViolations.length > 0) {
+    out.push({
+      priority: 'medium',
+      icon: '⚠',
+      title: `${capsViolations.length} ${capsViolations.length === 1 ? 'test ma' : 'testy mają'} krzyczące CAPS-y w nowym tytule`,
+      source: 'Z Twojej listy testów',
+      detail: `Testy: ${capsViolations.map((r) => escapeHTML(r.dupSuffix)).join(', ')}. Wynikowy tytuł w sklepie i tak będzie miał każde słowo z dużej (system to naprawia), ale w panelu wygląda jak krzyk i wprowadza w błąd.`,
+      action: 'Otwórz każdy test i przepisz pole „czym podmienić" tak, żeby wyglądało normalnie (np. „Zasłona do altany" zamiast „ZASŁONA DO ALTANY").',
+    });
+  }
+
+  if (activeRules.length > 7) {
+    out.push({
+      priority: 'medium',
+      icon: '↑',
+      title: `${activeRules.length} testów na raz — to może być za dużo`,
+      source: 'Z Twojej listy testów',
+      detail: 'Każdy wariant dzieli te same wyświetlenia, więc przy zbyt wielu testach żaden nie zbierze dość kliknięć na sensowną decyzję. Branżowa rekomendacja: 3 do 7 wariantów jednocześnie.',
+      action: 'Wyłącz na pauzę najmniej priorytetowe testy lub poczekaj aż obecne się zakończą, zanim dodasz nowe.',
+    });
+  }
+
+  return out;
+}
+
+// ====================================================================
+// SHOP — subtabs (perf, health, history)
+// ====================================================================
+async function renderShop() {
+  // Wire subtabs once
+  document.querySelectorAll('.subtab').forEach((tab) => {
+    if (tab.dataset.bound === '1') return;
+    tab.dataset.bound = '1';
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      const sub = tab.dataset.subtab;
+      location.hash = '#shop/' + sub;
+    });
+  });
+  // First render — populate the default subtab
+  await renderPerformance();
+}
+
+async function renderPerformance() {
+  await ensureCoreLoaded();
+  await ensurePerformanceSnapshotLoaded();
+
+  const banner = document.getElementById('perf-diagnosis-banner');
+  const summary = document.getElementById('perf-summary');
+  const table = document.getElementById('perf-campaigns-table');
+  const actions = document.getElementById('perf-actions');
+  const actionsCard = document.getElementById('perf-actions-card');
+  const sub = document.getElementById('perf-campaigns-sub');
+
+  if (state.perfSnapshotError) {
+    banner.innerHTML = `<div class="alert error show">Snapshot fetch error: ${escapeHTML(state.perfSnapshotError)}</div>`;
+    table.innerHTML = '';
+    return;
+  }
+  const s = state.perfSnapshot;
+  if (!s) return;
+
+  if (s.duplicate_diagnosis && s.duplicate_diagnosis.status === 'critical') {
+    const d = s.duplicate_diagnosis;
+    const fix = d.fix_proposal || {};
+    banner.innerHTML = `
+      <div class="alert error show" style="font-size:14.5px;line-height:1.65;">
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:500;margin-bottom:10px;">${escapeHTML(d.headline || 'Twój test tytułów nie zbiera danych')}</div>
+        ${d.root_cause_confirmed ? '<div style="margin-bottom:14px;font-style:italic;opacity:0.85;">Wiem już dokładnie dlaczego — sprawdziłem strukturę Twoich kampanii w Google Ads.</div>' : ''}
+        <div style="margin-top:12px;"><strong>Co znalazłem:</strong></div>
+        <ul style="margin:6px 0 14px 22px;font-size:13.5px;">
+          ${(d.evidence || []).map((e) => `<li style="margin-bottom:4px;">${escapeHTML(e)}</li>`).join('')}
+        </ul>
+        ${fix.name ? `
+          <div style="margin-top:18px;padding:16px 18px;background:rgba(154,184,150,0.08);border:1px solid rgba(154,184,150,0.25);border-radius:10px;">
+            <div style="color:var(--success);font-family:var(--font-display);font-size:17px;font-weight:500;margin-bottom:8px;">✓ Naprawa gotowa do wdrożenia</div>
+            <div style="font-size:13.5px;line-height:1.65;color:var(--text-dim);">
+              <strong>Co zrobię:</strong> ${escapeHTML(fix.name)}.<br>
+              <strong>Co zachowane:</strong> ${escapeHTML(fix.preserves || '')}.<br>
+              <strong>Czego się spodziewać:</strong> ${escapeHTML(fix.expected_outcome_week1 || '')}.<br>
+              ${fix.caveat_t6_t7 ? `<strong style="color:var(--warning);">Uwaga:</strong> ${escapeHTML(fix.caveat_t6_t7)}<br>` : ''}
+            </div>
+            <div style="margin-top:14px;font-size:13px;color:var(--text);"><strong>Powiedz mi „naprawiaj"</strong> w czacie, a wprowadzę zmianę z pełnym pre-flight diff.</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  } else {
+    banner.innerHTML = '';
+  }
+
+  const sum = s.summary_30d || {};
+  summary.innerHTML = `
+    <div class="kpi-tile">
+      <div class="kpi-label">Zwrot z reklam · 30 dni</div>
+      <div class="kpi-value">${(sum.blended_roas || 0).toFixed(2)}<span class="text-muted" style="font-size:16px;font-weight:400;font-style:italic;"> ×</span></div>
+      <div class="kpi-sub">Każda 1 zł wydana na reklamę przyniosła ${(sum.blended_roas || 0).toFixed(2)} zł sprzedaży</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="kpi-label">Wydane / zarobione</div>
+      <div class="kpi-value">${((sum.total_conv_value_pln || 0) / 1000).toFixed(0)}<span class="text-muted" style="font-size:16px;font-weight:400;"> tys.</span></div>
+      <div class="kpi-sub">${(sum.total_conv_value_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł przychodu z ${(sum.total_cost_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł budżetu</div>
+    </div>
+    <div class="kpi-tile">
+      <div class="kpi-label">Kliknięcia</div>
+      <div class="kpi-value">${(sum.total_clicks || 0).toLocaleString('pl-PL')}</div>
+      <div class="kpi-sub">${((sum.total_impressions || 0) / 1000).toFixed(0)} tys. wyświetleń · klikalność ${((sum.blended_ctr || 0) * 100).toFixed(2)}% · średnio ${(sum.blended_cpc_pln || 0).toFixed(2)} zł za klik</div>
+    </div>
+  `;
+
+  const campaigns = s.top_campaigns_30d || [];
+  sub.textContent = `${campaigns.length} kampanii — od największego budżetu · łącznie ${(sum.total_cost_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł w miesiącu`;
+  table.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Kampania</th>
+          <th>Rodzaj</th>
+          <th style="text-align:right;">Wyświetlenia</th>
+          <th style="text-align:right;">Kliknięcia</th>
+          <th style="text-align:right;">Klikalność</th>
+          <th style="text-align:right;">Cena za klik</th>
+          <th style="text-align:right;">Wydane</th>
+          <th style="text-align:right;">Konwersje</th>
+          <th style="text-align:right;">Przychód</th>
+          <th style="text-align:right;">Zwrot</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${campaigns.map((c) => {
+          const roasClass = c.roas >= 8 ? 'pill-success' : c.roas >= 3 ? 'pill-info' : c.roas >= 1 ? 'pill-warning' : 'pill-error';
+          return `
+          <tr>
+            <td><strong>${escapeHTML(c.name)}</strong></td>
+            <td><span class="pill pill-muted">${escapeHTML(c.channel)}</span></td>
+            <td style="text-align:right;" class="mono">${c.impressions.toLocaleString('pl-PL')}</td>
+            <td style="text-align:right;" class="mono">${c.clicks.toLocaleString('pl-PL')}</td>
+            <td style="text-align:right;" class="mono">${(c.ctr * 100).toFixed(2)}%</td>
+            <td style="text-align:right;" class="mono">${c.cpc_pln.toFixed(2)} zł</td>
+            <td style="text-align:right;" class="mono">${c.cost_pln.toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł</td>
+            <td style="text-align:right;" class="mono">${Math.round(c.conv).toLocaleString('pl-PL')}</td>
+            <td style="text-align:right;" class="mono">${c.conv_value_pln.toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł</td>
+            <td style="text-align:right;"><span class="pill ${roasClass}">${c.roas.toFixed(2)} ×</span></td>
+          </tr>
+        `}).join('')}
+      </tbody>
+    </table>
+  `;
+
+  const recs = s.duplicate_diagnosis?.recommended_actions || [];
+  if (recs.length > 0) {
+    actionsCard.style.display = 'block';
+    actions.innerHTML = `
+      <ol style="margin:0 0 0 22px;font-size:14px;line-height:1.7;">
+        ${recs.map((a) => `<li style="margin-bottom:10px;">${escapeHTML(a)}</li>`).join('')}
+      </ol>
+    `;
+  }
+}
+
 async function renderFeedHealth() {
   await ensureCoreLoaded();
 
-  // Wire regenerate button (idempotent — bind once)
   const regenBtn = document.getElementById('regenerate-btn');
   const regenStatus = document.getElementById('regenerate-status');
   if (regenBtn && regenBtn.dataset.bound !== '1') {
@@ -785,7 +1680,7 @@ async function renderFeedHealth() {
   }
 
   fetchedEl.textContent = state.feedStats?.fetched_at
-    ? 'Fetched ' + fmtRelative(state.feedStats.fetched_at)
+    ? 'Sprawdzone ' + fmtRelative(state.feedStats.fetched_at)
     : '';
 
   const o = state.feedStats?.output;
@@ -795,53 +1690,49 @@ async function renderFeedHealth() {
   body.innerHTML = `
     <table class="data-table">
       <tr>
-        <th style="width:200px;">Output TSV rows</th>
+        <th style="width:200px;">Warianty w sklepie</th>
         <td><strong>${o ? o.total_rows.toLocaleString('pl-PL') : '—'}</strong> · ${o ? Math.round(o.size_bytes / 1024) + ' KB' : '—'}</td>
       </tr>
       <tr>
-        <th>Last cron run</th>
+        <th>Ostatnie odświeżenie</th>
         <td>
           ${r ? `
             ${r.conclusion === 'success' ? '<span class="pill pill-success">success</span>' : `<span class="pill pill-${r.conclusion === 'failure' ? 'error' : 'warning'}">${escapeHTML(r.conclusion || r.status)}</span>`}
             · #${r.run_number} · ${fmtRelative(r.completed_at)} (${fmtDate(r.completed_at)})
-            · trigger: <span class="mono">${escapeHTML(r.trigger || '')}</span>
-            · <a href="${escapeHTML(r.html_url)}" target="_blank" rel="noopener" class="mono">view →</a>
+            · powód: <span class="mono">${escapeHTML(r.trigger || '')}</span>
+            · <a href="${escapeHTML(r.html_url)}" target="_blank" rel="noopener" class="mono">otwórz →</a>
           ` : '—'}
         </td>
       </tr>
       <tr>
-        <th>Last config commit</th>
+        <th>Ostatnia zmiana w konfiguracji</th>
         <td>
           ${c ? `
             <div class="text-dim">${escapeHTML(c.message)}</div>
             <div class="text-muted" style="font-size:12px;">
-              <span class="mono">${escapeHTML(c.short_sha)}</span> · ${escapeHTML(c.author)} · ${fmtDate(c.timestamp)} · <a href="${escapeHTML(c.html_url)}" target="_blank" rel="noopener" class="mono">view →</a>
+              <span class="mono">${escapeHTML(c.short_sha)}</span> · ${escapeHTML(c.author)} · ${fmtDate(c.timestamp)} · <a href="${escapeHTML(c.html_url)}" target="_blank" rel="noopener" class="mono">otwórz →</a>
             </div>
           ` : '—'}
         </td>
       </tr>
       <tr>
-        <th>Feed pipeline</th>
-        <td>
-          FeedOptimise (source) → GitHub Actions (cron 1h) → GitHub Pages (TSV) → GMC fetch
+        <th>Łańcuch sklepu</th>
+        <td class="text-dim" style="font-size:13px;">
+          FeedOptimise (źródło) → GitHub Actions (cron co 1h) → GitHub Pages (TSV) → Google Merchant Center
         </td>
       </tr>
       <tr>
-        <th>GMC re-fetch</th>
-        <td class="text-muted">Configured in Google Merchant Center · cron 6–24h depending on settings</td>
+        <th>Re-fetch GMC</th>
+        <td class="text-muted">Skonfigurowane w Google Merchant Center · cron 6–24h w zależności od ustawień</td>
       </tr>
     </table>
   `;
 }
 
-// ---------- HISTORIA ----------
-// Tłumaczy techniczne git commits na ludzki język. Ukrywa SHA, bot-names,
-// "chore(rule-action): apply issue #N" technicalia.
+// History
 function humanizeCommitMessage(msg, author) {
   if (!msg) return { title: 'Zmiana', who: author || 'system' };
   const m = msg.replace(/\n.*$/s, '').trim();
-
-  // Wzorce automatyczne (workflow / bot)
   if (/chore: auto-regenerate/.test(m)) return { title: 'Sklep odświeżył się automatycznie', who: 'system', kind: 'auto' };
   if (/chore\(rule-action\)/.test(m)) {
     const issueNum = m.match(/issue #(\d+)/)?.[1];
@@ -851,7 +1742,7 @@ function humanizeCommitMessage(msg, author) {
   if (/chore: manual regenerate/.test(m)) return { title: 'Ręczne odświeżenie sklepu', who: 'Ty', kind: 'manual' };
   if (/feat: add variant/.test(m)) {
     const issueNum = m.match(/issue #(\d+)/)?.[1];
-    return { title: 'Nowy test tytułu dodany', who: 'Ty', kind: 'add', note: issueNum ? `przez formularz #${issueNum}` : '' };
+    return { title: 'Nowy test dodany', who: 'Ty', kind: 'add', note: issueNum ? `przez formularz #${issueNum}` : '' };
   }
   if (/chore\(rules\):/.test(m)) {
     if (/toggle/.test(m)) return { title: 'Pauza/wznowienie testu', who: 'Ty', kind: 'toggle' };
@@ -862,7 +1753,6 @@ function humanizeCommitMessage(msg, author) {
   if (/^fix/.test(m)) return { title: m.replace(/^fix[\(:][^)]*\)?\s*:?\s*/, '').replace(/^\w/, (c) => c.toUpperCase()), who: author || 'Ty', kind: 'fix' };
   if (/^feat/.test(m)) return { title: m.replace(/^feat\s*:?\s*/, '').replace(/^\w/, (c) => c.toUpperCase()), who: author || 'Ty', kind: 'add' };
 
-  // Default: pokaż surowe ale bez SHA/issue formalizmu
   const cleaned = m.replace(/\s*#\d+\s*/g, ' ').replace(/^chore\s*\([^)]+\)\s*:\s*/i, '').replace(/^\w/, (c) => c.toUpperCase());
   return { title: cleaned, who: author || 'system', kind: 'other' };
 }
@@ -930,623 +1820,60 @@ async function renderHistory() {
   `;
 }
 
-// ---------- HYPOTHESES ----------
-async function renderHypotheses() {
-  await ensureCoreLoaded();
-  await ensurePerformanceSnapshotLoaded();
-
-  const content = document.getElementById('hyp-content');
-  const subtitle = document.getElementById('hyp-subtitle');
-
-  const rules = state.config?.duplicateRules || [];
-  const snapshot = state.perfSnapshot;
-  const hypotheses = buildHypotheses(rules, snapshot);
-
-  const counts = {
-    critical: hypotheses.filter((h) => h.priority === 'critical').length,
-    high: hypotheses.filter((h) => h.priority === 'high').length,
-    medium: hypotheses.filter((h) => h.priority === 'medium').length,
-    low: hypotheses.filter((h) => h.priority === 'low').length,
-  };
-  const parts = [];
-  if (counts.critical) parts.push(`<span style="color:var(--error);">${counts.critical} pilne</span>`);
-  if (counts.high) parts.push(`<span style="color:var(--warning);">${counts.high} ważne</span>`);
-  if (counts.medium) parts.push(`${counts.medium} warto rozważyć`);
-  if (counts.low) parts.push(`${counts.low} drobnostek`);
-  subtitle.innerHTML = parts.length ? parts.join(' · ') : 'Wszystko gra — nic do roboty';
-
-  if (hypotheses.length === 0) {
-    content.innerHTML = '<div class="placeholder"><div class="placeholder-title">Brak hipotez — system w stabilnym stanie</div></div>';
-    return;
+// ====================================================================
+// TOAST + HELPERS
+// ====================================================================
+function showToast(message, type) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px;';
+    document.body.appendChild(container);
   }
-
-  content.innerHTML = hypotheses
-    .map((h) => {
-      const priorityColor = { critical: 'error', high: 'warning', medium: 'info', low: 'muted' }[h.priority] || 'muted';
-      return `
-    <div class="card mb-2" style="border-left:3px solid var(--${h.priority === 'critical' ? 'error' : h.priority === 'high' ? 'warning' : 'primary'});">
-      <div class="card-header">
-        <div>
-          <div class="card-title">${h.icon || '◆'} ${escapeHTML(h.title)}</div>
-          <div class="card-sub">${escapeHTML(h.source)}</div>
-        </div>
-        <span class="pill pill-${priorityColor}">${escapeHTML(h.priority)}</span>
-      </div>
-      <div style="font-size:13px;line-height:1.6;color:var(--text-dim);">${h.detail}</div>
-      ${h.action ? `<div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:6px;font-size:12px;"><strong>Sugerowana akcja:</strong> ${h.action}</div>` : ''}
-      ${h.evidence ? `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:11px;color:var(--muted);">Evidence ▾</summary><ul style="margin:6px 0 0 18px;font-size:11px;color:var(--text-dim);">${h.evidence.map((e) => `<li>${escapeHTML(e)}</li>`).join('')}</ul></details>` : ''}
-    </div>
-  `;
-    })
-    .join('');
+  const toast = document.createElement('div');
+  toast.className = 'alert show ' + (type || 'success');
+  toast.style.cssText = 'min-width:280px;max-width:420px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+  toast.innerHTML = message;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 4500);
+  setTimeout(() => toast.remove(), 5000);
 }
 
-function buildHypotheses(rules, snapshot) {
-  const out = [];
-
-  // Najpilniejsze: A/B test nie zbiera danych (z FULL diagnozą + 1-click fix)
-  if (snapshot?.duplicate_diagnosis?.status === 'critical') {
-    const d = snapshot.duplicate_diagnosis;
-    const fix = d.fix_proposal || {};
-    const detail = fix.preserves
-      ? `<strong>Dlaczego tak się dzieje:</strong><br>${(d.evidence || []).slice(0,2).map((e) => '• ' + escapeHTML(e)).join('<br>')}<br><br><strong>Jak to naprawić:</strong> ${escapeHTML(fix.name || '')}.<br>${escapeHTML(fix.preserves || '')}<br><br><strong>Czego się spodziewać:</strong> ${escapeHTML(fix.expected_outcome_week1 || '')}`
-      : `<strong>Dlaczego tak się dzieje:</strong> ${escapeHTML(d.evidence?.[0] || '—')}`;
-    out.push({
-      priority: 'critical',
-      icon: '!',
-      title: d.headline || 'Twój test tytułów nie zbiera danych',
-      source: 'Confirmed przez analizę Twoich kampanii (custom_label_8 ad-group filters)',
-      detail,
-      action: fix.caveat_t6_t7 ? `Powiedz mi „naprawiaj" — przygotowałem już pre-flight diff. <br><br><em>Uwaga: ${escapeHTML(fix.caveat_t6_t7)}</em>` : 'Powiedz mi „naprawiaj" — pre-flight diff gotowy.',
-      evidence: d.evidence,
-    });
-  }
-
-  // PROPOSED NEW TESTS — 8 konkretnych propozycji z evidence
-  for (const t of (snapshot?.proposed_new_tests || []).slice(0, 5)) {
-    const priority = t.priority_score >= 9 ? 'high' : t.priority_score >= 7 ? 'medium' : 'low';
-    out.push({
-      priority,
-      icon: '+',
-      title: `Spróbuj: „${escapeHTML(t.title_proposed)}"`,
-      source: `Z danych GSC + Google Ads + GA4 · grupa „${escapeHTML(t.match_group)}" · ${t.products_in_scope} produktów`,
-      detail: escapeHTML(t.evidence),
-      action: `Spodziewany wpływ: <strong>+${t.expected_revenue_pln_per_month?.toLocaleString('pl-PL')} zł/mc przychodu</strong>${t.campaign_target ? ` · wpadnie do: ${escapeHTML(t.campaign_target)}` : ''}<br><br>Powiedz mi numer reguły (np. „t9") i sufix, a dodam test do config.`,
-    });
-  }
-
-  // Kampania traci pieniądze
-  for (const c of snapshot?.underperforming_campaigns || []) {
-    out.push({
-      priority: 'high',
-      icon: '↓',
-      title: `Kampania „${c.name}" oddaje budżet niewspółmiernie do przychodu`,
-      source: 'Z danych z Twoich kampanii, ostatni miesiąc',
-      detail: escapeHTML(c.alert),
-      action: 'Spauzuj tę kampanię. Jeśli to świadoma kampania pozyskująca nowych klientów — sprawdź inne wskaźniki niż zwrot (np. koszt pozyskania klienta).',
-    });
-  }
-
-  // Najlepsza kampania
-  for (const w of snapshot?.winner_campaigns?.slice(0, 1) || []) {
-    out.push({
-      priority: 'medium',
-      icon: '★',
-      title: `Skopiuj sposób, w jaki działa „${w.name}"`,
-      source: 'Najlepsza Twoja kampania, ostatni miesiąc',
-      detail: escapeHTML(w.note),
-      action: 'Spójrz, jak ta kampania ma ustawione bidy, grupy assetów i cele ROAS. Zastosuj to samo w pozostałych PMax-ach.',
-    });
-  }
-
-  // Nieaktywne reguły
-  const activeRules = rules.filter((r) => r.active);
-  const inactive = rules.filter((r) => !r.active);
-
-  if (inactive.length > 0) {
-    out.push({
-      priority: 'low',
-      icon: '◦',
-      title: `Masz ${inactive.length} ${inactive.length === 1 ? 'wyłączony test' : 'wyłączone testy'} — może warto sprzątnąć`,
-      source: 'Z Twojej listy testów',
-      detail: `Testy: ${inactive.map((r) => escapeHTML(r.dupSuffix || r.id)).join(', ')}. Nie generują wariantów, ale wciąż są na liście.`,
-      action: 'Skasuj jeśli wiesz, że już do nich nie wrócisz. Zostaw jeśli to reference do tytułów które weszły do głównego feedu.',
-    });
-  }
-
-  // ALL-CAPS w replaceWith
-  const capsViolations = activeRules.filter((r) => /[A-ZĄĆĘŁŃÓŚŹŻ]{3,}/.test(r.replaceWith || ''));
-  if (capsViolations.length > 0) {
-    out.push({
-      priority: 'medium',
-      icon: '⚠',
-      title: `${capsViolations.length} ${capsViolations.length === 1 ? 'test ma' : 'testy mają'} krzyczące CAPS-y w nowym tytule`,
-      source: 'Z Twojej listy testów',
-      detail: `Testy: ${capsViolations.map((r) => escapeHTML(r.dupSuffix)).join(', ')}. Wynikowy tytuł w sklepie i tak będzie miał każde słowo z dużej (system to naprawia), ale w panelu wygląda jak krzyk i wprowadza w błąd.`,
-      action: 'Otwórz każdy test i przepisz pole „czym podmienić" tak, żeby wyglądało normalnie (np. „Zasłona do altany" zamiast „ZASŁONA DO ALTANY").',
-    });
-  }
-
-  // Zbyt dużo wariantów
-  if (activeRules.length > 7) {
-    out.push({
-      priority: 'medium',
-      icon: '↑',
-      title: `${activeRules.length} testów na raz — to może być za dużo`,
-      source: 'Z Twojej listy testów',
-      detail: 'Każdy wariant dzieli te same wyświetlenia, więc przy zbyt wielu testach żaden nie zbierze dość kliknięć na sensowną decyzję. Branżowa rekomendacja: 3 do 7 wariantów jednocześnie.',
-      action: 'Wyłącz na pauzę najmniej priorytetowe testy lub poczekaj aż obecne się zakończą, zanim dodasz nowe.',
-    });
-  }
-
-  return out;
+function showSaveSuccess(action, j) {
+  const where = j.method === 'issue_fallback'
+    ? 'zapisałem w bezpiecznej kolejce, sklep się zaktualizuje w ciągu minuty'
+    : 'sklep zaktualizuje się w ciągu kilku minut';
+  const link = j.commit_url || j.issue_url || '#';
+  showToast(
+    `✓ ${escapeHTML(action)} — ${where}. <a href="${escapeHTML(link)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">zobacz szczegóły →</a>`,
+    'success'
+  );
 }
 
-// ---------- PERFORMANCE ----------
-async function renderPerformance() {
-  await ensurePerformanceSnapshotLoaded();
-
-  const subtitle = document.getElementById('perf-subtitle');
-  const banner = document.getElementById('perf-diagnosis-banner');
-  const summary = document.getElementById('perf-summary');
-  const table = document.getElementById('perf-campaigns-table');
-  const actions = document.getElementById('perf-actions');
-  const actionsCard = document.getElementById('perf-actions-card');
-  const sub = document.getElementById('perf-campaigns-sub');
-
-  if (state.perfSnapshotError) {
-    subtitle.textContent = 'Błąd ładowania';
-    banner.innerHTML = `<div class="alert error show">Snapshot fetch error: ${escapeHTML(state.perfSnapshotError)}</div>`;
-    table.innerHTML = '';
-    return;
-  }
-  const s = state.perfSnapshot;
-  if (!s) return;
-
-  subtitle.innerHTML = `Liczby z Twojego konta Google Ads, sprawdzone <em>${escapeHTML((s.captured_at || '').substring(0, 16).replace('T', ' '))}</em>`;
-
-  // Critical diagnosis banner — z confirmed root cause + 1-click fix CTA
-  if (s.duplicate_diagnosis && s.duplicate_diagnosis.status === 'critical') {
-    const d = s.duplicate_diagnosis;
-    const fix = d.fix_proposal || {};
-    banner.innerHTML = `
-      <div class="alert error show" style="font-size:14.5px;line-height:1.65;">
-        <div style="font-family:var(--font-display);font-size:20px;font-weight:500;margin-bottom:10px;">${escapeHTML(d.headline || 'Twój test tytułów nie zbiera danych')}</div>
-        ${d.root_cause_confirmed ? '<div style="margin-bottom:14px;font-style:italic;opacity:0.85;">Wiem już dokładnie dlaczego — sprawdziłem strukturę Twoich kampanii w Google Ads.</div>' : ''}
-
-        <div style="margin-top:12px;"><strong>Co znalazłem:</strong></div>
-        <ul style="margin:6px 0 14px 22px;font-size:13.5px;">
-          ${(d.evidence || []).map((e) => `<li style="margin-bottom:4px;">${escapeHTML(e)}</li>`).join('')}
-        </ul>
-
-        ${fix.name ? `
-          <div style="margin-top:18px;padding:16px 18px;background:rgba(154,184,150,0.08);border:1px solid rgba(154,184,150,0.25);border-radius:10px;">
-            <div style="color:var(--success);font-family:var(--font-display);font-size:17px;font-weight:500;margin-bottom:8px;">✓ Naprawa gotowa do wdrożenia</div>
-            <div style="font-size:13.5px;line-height:1.65;color:var(--text-dim);">
-              <strong>Co zrobię:</strong> ${escapeHTML(fix.name)}.<br>
-              <strong>Co zachowane:</strong> ${escapeHTML(fix.preserves || '')}.<br>
-              <strong>Czego się spodziewać:</strong> ${escapeHTML(fix.expected_outcome_week1 || '')}.<br>
-              ${fix.caveat_t6_t7 ? `<strong style="color:var(--warning);">Uwaga:</strong> ${escapeHTML(fix.caveat_t6_t7)}<br>` : ''}
-            </div>
-            <div style="margin-top:14px;font-size:13px;color:var(--text);"><strong>Powiedz mi „naprawiaj"</strong> w czacie, a wprowadzę zmianę z pełnym pre-flight diff. Możesz to potem w 30 sek cofnąć (revert commit).</div>
-          </div>
-        ` : ''}
-      </div>
-    `;
-  } else {
-    banner.innerHTML = '';
-  }
-
-  // Summary KPI strip
-  const sum = s.summary_30d || {};
-  summary.innerHTML = `
-    <div class="kpi-tile">
-      <div class="kpi-label">Zwrot z reklam · 30 dni</div>
-      <div class="kpi-value">${(sum.blended_roas || 0).toFixed(2)}<span class="text-muted" style="font-size:16px;font-weight:400;font-style:italic;"> ×</span></div>
-      <div class="kpi-sub">Każda 1 zł wydana na reklamę przyniosła ${(sum.blended_roas || 0).toFixed(2)} zł sprzedaży</div>
-    </div>
-    <div class="kpi-tile">
-      <div class="kpi-label">Wydane / zarobione</div>
-      <div class="kpi-value">${((sum.total_conv_value_pln || 0) / 1000).toFixed(0)}<span class="text-muted" style="font-size:16px;font-weight:400;"> tys.</span></div>
-      <div class="kpi-sub">${(sum.total_conv_value_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł przychodu z ${(sum.total_cost_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł budżetu</div>
-    </div>
-    <div class="kpi-tile">
-      <div class="kpi-label">Kliknięcia</div>
-      <div class="kpi-value">${(sum.total_clicks || 0).toLocaleString('pl-PL')}</div>
-      <div class="kpi-sub">${((sum.total_impressions || 0) / 1000).toFixed(0)} tys. wyświetleń · klikalność ${((sum.blended_ctr || 0) * 100).toFixed(2)}% · średnio ${(sum.blended_cpc_pln || 0).toFixed(2)} zł za klik</div>
-    </div>
-    <div class="kpi-tile">
-      <div class="kpi-label">Twoje testy tytułów</div>
-      <div class="kpi-value" style="color:var(--error);">0<span class="text-muted" style="font-size:16px;font-weight:400;font-style:italic;"> wyświetleń</span></div>
-      <div class="kpi-sub error" style="color:var(--error);">Test nie zbiera danych — patrz diagnoza powyżej</div>
-    </div>
-  `;
-
-  // Top campaigns table
-  const campaigns = s.top_campaigns_30d || [];
-  sub.textContent = `${campaigns.length} kampanii — od największego budżetu · łącznie ${(sum.total_cost_pln || 0).toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł w miesiącu`;
-  table.innerHTML = `
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Kampania</th>
-          <th>Rodzaj</th>
-          <th style="text-align:right;">Wyświetlenia</th>
-          <th style="text-align:right;">Kliknięcia</th>
-          <th style="text-align:right;">Klikalność</th>
-          <th style="text-align:right;">Cena za klik</th>
-          <th style="text-align:right;">Wydane</th>
-          <th style="text-align:right;">Konwersje</th>
-          <th style="text-align:right;">Przychód</th>
-          <th style="text-align:right;">Zwrot</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${campaigns.map((c) => {
-          const roasClass = c.roas >= 8 ? 'pill-success' : c.roas >= 3 ? 'pill-info' : c.roas >= 1 ? 'pill-warning' : 'pill-error';
-          return `
-          <tr>
-            <td><strong>${escapeHTML(c.name)}</strong></td>
-            <td><span class="pill pill-muted">${escapeHTML(c.channel)}</span></td>
-            <td style="text-align:right;" class="mono">${c.impressions.toLocaleString('pl-PL')}</td>
-            <td style="text-align:right;" class="mono">${c.clicks.toLocaleString('pl-PL')}</td>
-            <td style="text-align:right;" class="mono">${(c.ctr * 100).toFixed(2)}%</td>
-            <td style="text-align:right;" class="mono">${c.cpc_pln.toFixed(2)} zł</td>
-            <td style="text-align:right;" class="mono">${c.cost_pln.toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł</td>
-            <td style="text-align:right;" class="mono">${Math.round(c.conv).toLocaleString('pl-PL')}</td>
-            <td style="text-align:right;" class="mono">${c.conv_value_pln.toLocaleString('pl-PL', { maximumFractionDigits: 0 })} zł</td>
-            <td style="text-align:right;"><span class="pill ${roasClass}">${c.roas.toFixed(2)} ×</span></td>
-          </tr>
-        `}).join('')}
-      </tbody>
-    </table>
-  `;
-
-  // Recommended actions
-  const recs = s.duplicate_diagnosis?.recommended_actions || [];
-  if (recs.length > 0) {
-    actionsCard.style.display = 'block';
-    actions.innerHTML = `
-      <ol style="margin:0 0 0 22px;font-size:14px;line-height:1.7;">
-        ${recs.map((a) => `<li style="margin-bottom:10px;">${escapeHTML(a)}</li>`).join('')}
+function format403Help(j) {
+  if (!j.fix) return escapeHTML(j.error || 'unknown');
+  return `
+    <strong>${escapeHTML(j.error)}</strong><br>
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer;font-weight:600;">Jak naprawić (krok po kroku) ▾</summary>
+      <ol style="margin:6px 0 0 18px;font-size:12px;line-height:1.6;">
+        <li><a href="${escapeHTML(j.fix.step_1.split(': ')[1])}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Generate fine-grained PAT →</a></li>
+        <li>${escapeHTML(j.fix.step_2)}</li>
+        <li>${escapeHTML(j.fix.step_3)}</li>
+        <li><a href="${escapeHTML(j.fix.step_4.split(': ')[1])}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Update GITHUB_TOKEN in Vercel →</a></li>
+        <li>${escapeHTML(j.fix.step_5)}</li>
       </ol>
-    `;
-  }
-}
-
-// ---------- IMAGES ----------
-const imagesState = {
-  page: 1,
-  perPage: 24,
-  q: '',
-  total: 0,
-  selectedProductId: null,
-};
-
-async function renderImages() {
-  const search = document.getElementById('images-search');
-  const btn = document.getElementById('images-search-btn');
-
-  function trigger() {
-    imagesState.q = search.value.trim();
-    imagesState.page = 1;
-    fetchAndRenderProductList();
-  }
-  btn.addEventListener('click', trigger);
-  search.addEventListener('keydown', (e) => { if (e.key === 'Enter') trigger(); });
-
-  document.getElementById('detail-close').addEventListener('click', () => {
-    document.getElementById('images-detail').style.display = 'none';
-    imagesState.selectedProductId = null;
-  });
-
-  fetchAndRenderProductList();
-}
-
-async function fetchAndRenderProductList() {
-  const grid = document.getElementById('images-grid');
-  const countEl = document.getElementById('images-count');
-  const pagEl = document.getElementById('images-pagination');
-
-  grid.innerHTML = '<div class="loading">Ładuję produkty z feedu (~1-3s pierwszy raz, potem cache 5 min)…</div>';
-
-  const params = new URLSearchParams({
-    page: imagesState.page,
-    perPage: imagesState.perPage,
-  });
-  if (imagesState.q) params.set('q', imagesState.q);
-
-  let data;
-  try {
-    data = await fetchJSON('/api/products?' + params);
-  } catch (e) {
-    countEl.textContent = 'Błąd ładowania';
-    grid.innerHTML = `<div class="alert error show">Nie udało się pobrać produktów: ${escapeHTML(e.message)}</div>`;
-    pagEl.innerHTML = '';
-    return;
-  }
-
-  imagesState.total = data.pagination.total;
-  countEl.textContent = `${data.pagination.total.toLocaleString('pl-PL')} produktów${
-    imagesState.q ? ` (filtr: "${imagesState.q}")` : ''
-  } · strona ${data.pagination.page}/${data.pagination.totalPages}`;
-
-  if (data.products.length === 0) {
-    grid.innerHTML = '<div class="placeholder"><div class="placeholder-title">Brak wyników</div></div>';
-    pagEl.innerHTML = '';
-    return;
-  }
-
-  grid.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
-      ${data.products
-        .map(
-          (p) => `
-        <div class="product-tile" data-id="${escapeHTML(p.id)}" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color 0.12s;">
-          <div style="aspect-ratio:1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-            <img loading="lazy" src="${escapeHTML(p.image_link)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=color:var(--muted);font-size:11px;>brak zdjęcia</span>'" />
-          </div>
-          <div style="padding:10px;">
-            <div style="font-size:12px;font-weight:600;line-height:1.3;max-height:32px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHTML(p.title)}</div>
-            <div class="mono" style="font-size:11px;color:var(--muted);margin-top:4px;">id ${escapeHTML(p.id)}</div>
-            <div style="margin-top:4px;">
-              <span class="pill pill-info">${p.total_images} ${p.total_images === 1 ? 'image' : 'images'}</span>
-              ${p.availability && p.availability.toLowerCase() !== 'in stock' ? '<span class="pill pill-muted">out of stock</span>' : ''}
-            </div>
-          </div>
-        </div>
-      `
-        )
-        .join('')}
-    </div>
+    </details>
   `;
-  // Hover style + click handlers
-  grid.querySelectorAll('.product-tile').forEach((tile) => {
-    tile.addEventListener('mouseenter', () => (tile.style.borderColor = 'var(--border-strong)'));
-    tile.addEventListener('mouseleave', () => (tile.style.borderColor = 'var(--border)'));
-    tile.addEventListener('click', () => openProductDetail(tile.dataset.id));
-  });
-
-  // Pagination
-  const tp = data.pagination.totalPages;
-  const p = data.pagination.page;
-  pagEl.innerHTML = `
-    <div class="text-muted" style="font-size:12px;">
-      Łącznie ${data.pagination.total.toLocaleString('pl-PL')} produktów · pokazuję ${data.products.length}
-    </div>
-    <div class="flex-gap-1">
-      <button class="btn" id="pag-prev" ${p <= 1 ? 'disabled' : ''} style="padding:6px 12px;background:var(--card-hover);color:var(--text);">← Prev</button>
-      <span class="mono text-dim" style="padding:6px 8px;font-size:12px;">${p} / ${tp}</span>
-      <button class="btn" id="pag-next" ${p >= tp ? 'disabled' : ''} style="padding:6px 12px;background:var(--card-hover);color:var(--text);">Next →</button>
-    </div>
-  `;
-  document.getElementById('pag-prev').addEventListener('click', () => {
-    if (imagesState.page > 1) { imagesState.page--; fetchAndRenderProductList(); }
-  });
-  document.getElementById('pag-next').addEventListener('click', () => {
-    if (imagesState.page < tp) { imagesState.page++; fetchAndRenderProductList(); }
-  });
 }
 
-async function openProductDetail(productId) {
-  imagesState.selectedProductId = productId;
-  const detail = document.getElementById('images-detail');
-  detail.style.display = 'block';
-  document.getElementById('detail-title').textContent = 'Ładuję…';
-  document.getElementById('detail-meta').textContent = 'id ' + productId;
-  document.getElementById('detail-gallery').innerHTML = '<div class="loading">Ładuję galerię…</div>';
-  document.getElementById('detail-preview').innerHTML = '';
-
-  // Scroll into view
-  detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  let data;
-  try {
-    data = await fetchJSON('/api/products?id=' + encodeURIComponent(productId));
-  } catch (e) {
-    document.getElementById('detail-gallery').innerHTML =
-      `<div class="alert error show">Błąd: ${escapeHTML(e.message)}</div>`;
-    return;
-  }
-
-  const p = data.products[0];
-  if (!p) {
-    document.getElementById('detail-gallery').innerHTML =
-      '<div class="alert error show">Produkt nie znaleziony</div>';
-    return;
-  }
-
-  document.getElementById('detail-title').textContent = p.title;
-  document.getElementById('detail-meta').innerHTML =
-    `id <strong>${escapeHTML(p.id)}</strong> · ${escapeHTML(p.product_type || '—')} · ${escapeHTML(p.availability || '—')} · ${escapeHTML(p.price || '')}`;
-
-  const allImages = [p.image_link, ...p.additional_image_link].filter(Boolean);
-  const gallery = document.getElementById('detail-gallery');
-
-  gallery.innerHTML = `
-    <div class="mb-2 text-dim">${allImages.length} obrazków w feedzie — kliknij dowolny aby zobaczyć "co by się stało jako głównego image".</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">
-      ${allImages
-        .map(
-          (url, idx) => `
-        <div class="gal-tile" data-url="${escapeHTML(url)}" data-idx="${idx}" style="position:relative;cursor:pointer;border:2px solid ${idx === 0 ? 'var(--primary)' : 'var(--border)'};border-radius:8px;overflow:hidden;background:#000;aspect-ratio:1;">
-          <img loading="lazy" src="${escapeHTML(url)}" alt="" style="width:100%;height:100%;object-fit:cover;" />
-          ${idx === 0 ? '<span class="pill pill-info" style="position:absolute;top:6px;left:6px;">MAIN</span>' : `<span class="pill pill-muted" style="position:absolute;top:6px;left:6px;">#${idx + 1}</span>`}
-        </div>
-      `
-        )
-        .join('')}
-    </div>
-  `;
-
-  gallery.querySelectorAll('.gal-tile').forEach((tile) => {
-    tile.addEventListener('click', () => previewImageSwap(p, parseInt(tile.dataset.idx, 10)));
-  });
-}
-
-function previewImageSwap(product, newMainIdx) {
-  const allImages = [product.image_link, ...product.additional_image_link].filter(Boolean);
-  const newMain = allImages[newMainIdx];
-  const previewEl = document.getElementById('detail-preview');
-
-  if (newMainIdx === 0) {
-    previewEl.innerHTML = `
-      <div class="alert warning show">
-        To już jest aktualne główne zdjęcie. Wybierz inne aby zobaczyć preview swap-as-main.
-      </div>
-    `;
-    return;
-  }
-
-  const dupSuffix = 'img_' + ('abcdefgh'[Math.min(newMainIdx - 1, 7)] || 'x');
-  const imageRule = {
-    offerId: product.id,
-    promote_to_main_index: newMainIdx,
-    dupSuffix,
-    customLabel1: dupSuffix,
-    notes: `Image variant ${dupSuffix} — promotes additional_image_link[${newMainIdx - 1}] as main`,
-  };
-
-  previewEl.innerHTML = `
-    <div class="card" style="background:var(--bg);">
-      <div class="card-header">
-        <div class="card-title">Preview: swap-as-main</div>
-        <span class="pill pill-info">enabled · auto-fallback to Issue if PAT scope insufficient</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 40px 1fr;gap:20px;align-items:center;">
-        <div>
-          <div class="text-muted mb-1" style="font-size:11px;">PRZED (obecne MAIN)</div>
-          <div style="aspect-ratio:1;background:#000;border-radius:8px;overflow:hidden;">
-            <img src="${escapeHTML(product.image_link)}" alt="" style="width:100%;height:100%;object-fit:contain;" />
-          </div>
-        </div>
-        <div style="text-align:center;font-size:32px;color:var(--primary);">→</div>
-        <div>
-          <div class="text-muted mb-1" style="font-size:11px;">PO (proponowane MAIN, #${newMainIdx + 1})</div>
-          <div style="aspect-ratio:1;background:#000;border-radius:8px;overflow:hidden;border:2px solid var(--primary);">
-            <img src="${escapeHTML(newMain)}" alt="" style="width:100%;height:100%;object-fit:contain;" />
-          </div>
-        </div>
-      </div>
-      <div class="mb-2" style="margin-top:16px;padding:12px;background:var(--card-hover);border-radius:8px;font-size:12px;">
-        <div class="mb-1"><strong>Image rule do dodania (w config.json):</strong></div>
-        <pre class="mono" style="font-size:11px;color:var(--text-dim);white-space:pre-wrap;">${escapeHTML(JSON.stringify({
-          id: `img-${product.id}-${dupSuffix}`,
-          ...imageRule,
-          active: true,
-        }, null, 2))}</pre>
-        <div style="margin-top:8px;color:var(--text-dim);font-size:11px;">
-          ⚠ <strong>Heads-up:</strong> imageRule path w generate-feed.js jest gated by <span class="mono">feature_flags.image_rules_enabled</span> (default <span class="mono">false</span>). Reguła zostanie zapisana ale do generation TSV potrzeba ręcznie włączyć flag w config.json (next iteration: enable flag w UI).
-        </div>
-      </div>
-      <button class="btn btn-block" id="image-apply-btn">Apply image rule (commit to config.json)</button>
-    </div>
-  `;
-
-  document.getElementById('image-apply-btn').addEventListener('click', async () => {
-    const btn = document.getElementById('image-apply-btn');
-    btn.disabled = true;
-    btn.textContent = 'Zapisuję…';
-    try {
-      const r = await fetch('/api/image-rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(imageRule),
-      });
-      const j = await r.json();
-      if (r.ok || r.status === 202) {
-        const method = j.method === 'issue_fallback'
-          ? `via Issue #${j.issue_number} (workflow apply w ~30s)`
-          : 'direct PATCH';
-        const link = j.commit_url || j.issue_url || '#';
-        showToast(`✓ Image rule zapisana ${method}. <a class="mono" href="${escapeHTML(link)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">view →</a>`, 'success');
-        btn.textContent = '✓ Applied';
-      } else {
-        showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
-        btn.disabled = false;
-        btn.textContent = 'Apply image rule';
-      }
-    } catch (e) {
-      showToast('Błąd sieci: ' + escapeHTML(e.message), 'error');
-      btn.disabled = false;
-      btn.textContent = 'Apply image rule';
-    }
-  });
-}
-
-function renderAddVariant() {
-  const form = document.getElementById('variant-form');
-  const btn = document.getElementById('submit-btn');
-  const alertEl = document.getElementById('alert');
-  if (!form || form.dataset.bound === '1') return;
-  form.dataset.bound = '1';
-
-  function showAlert(msg, type) {
-    alertEl.innerHTML = msg;
-    alertEl.className = 'alert show ' + type;
-  }
-
-  // Live Title Case preview for replaceWith
-  const replaceInput = document.getElementById('replaceWith');
-  const replacePreview = document.getElementById('replace-preview');
-  function updatePreview() {
-    const raw = replaceInput.value.trim();
-    if (!raw) {
-      replacePreview.textContent = '—';
-      replacePreview.style.color = 'var(--muted)';
-      return;
-    }
-    const normalized = wordCapitalize(raw);
-    replacePreview.textContent = normalized;
-    replacePreview.style.color = raw === normalized ? 'var(--success)' : 'var(--warning)';
-  }
-  replaceInput.addEventListener('input', updatePreview);
-  updatePreview();
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    btn.disabled = true;
-    btn.textContent = 'Dodaję…';
-    alertEl.className = 'alert';
-
-    const data = {
-      matchInTitle: form.matchInTitle.value.trim(),
-      searchInTitle: form.searchInTitle.value.trim(),
-      replaceWith: form.replaceWith.value.trim(),
-      dupSuffix: form.dupSuffix.value.trim(),
-      notes: form.notes.value.trim(),
-    };
-
-    try {
-      const r = await fetch('/api/add-variant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      const j = await r.json();
-      if (r.ok) {
-        showAlert(`✓ Świetnie, dodałem Twój nowy test. Wjedzie do sklepu w ciągu godziny. <a href="${escapeHTML(j.url || '#')}" target="_blank" rel="noopener">zobacz szczegóły →</a>`, 'success');
-        form.reset();
-      } else {
-        showAlert('Coś nie wyszło: ' + escapeHTML(j.error || 'nieznany powód') + '. Spróbuj jeszcze raz.', 'error');
-      }
-    } catch (err) {
-      showAlert('Sieć nie odpowiada: ' + escapeHTML(err.message) + '. Sprawdź połączenie i spróbuj ponownie.', 'error');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Dodaj nowy test';
-    }
-  });
-}
-
-// ---------- HEALTH BANNER ----------
-// Shows once on page load with status of write paths.
-// Helps Marcin understand at a glance what works fully vs needs token rotation.
+// ====================================================================
+// HEALTH BANNER
+// ====================================================================
 async function renderHealthBanner() {
   const container = document.getElementById('health-banner-container');
   if (!container) return;
-
-  // Quick probes: GET /api/config (read) + try regenerate as POST (cheap-ish)
   let configOk = false;
   try {
     const r = await fetch('/api/config');
@@ -1562,7 +1889,6 @@ async function renderHealthBanner() {
     return;
   }
 
-  // Krótkie powitanie po polsku — auto-dismiss
   container.innerHTML = `
     <div id="health-banner-inner" style="background:var(--primary-soft);color:var(--primary);padding:10px 36px;border-bottom:1px solid rgba(212,165,116,0.25);font-size:13px;text-align:center;transition:opacity 0.4s;font-style:italic;">
       Wszystko gra. Każda zmiana którą tu zrobisz zostanie zapisana bezpiecznie i trafi do sklepu w ciągu kilku minut.
@@ -1579,17 +1905,14 @@ async function renderHealthBanner() {
   }, 8000);
 }
 
-// ---------- Init ----------
-let _coreLoaded = null;
-function ensureCoreLoaded() {
-  if (!_coreLoaded) _coreLoaded = loadCoreData();
-  return _coreLoaded;
-}
-
+// ====================================================================
+// INIT
+// ====================================================================
 window.addEventListener('hashchange', onHashChange);
 document.addEventListener('DOMContentLoaded', () => {
-  // Start core data fetch in background ASAP
   ensureCoreLoaded();
   renderHealthBanner();
+  bindSidePanelHandlers();
+  bindAddPanelHandlers();
   onHashChange();
 });

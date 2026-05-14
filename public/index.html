@@ -4,27 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Room99 — Twoja pracownia</title>
-  <meta name="description" content="Spokojne miejsce do zarządzania reklamami Room99: testy tytułów, zdjęcia produktów, wyniki kampanii Google Shopping." />
+  <meta name="description" content="Spokojne miejsce do zarządzania reklamami Room99: testy tytułów, opisów i zdjęć w Google Shopping." />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <nav class="top-nav">
     <div class="brand">Room99 <span class="brand-accent">pracownia</span></div>
     <div class="tabs" id="tabs">
-      <a href="#today" data-tab="today">Dzień dobry</a>
-      <a href="#rules" data-tab="rules">Testy tytułów</a>
-      <a href="#hypotheses" data-tab="hypotheses">Co warto spróbować</a>
-      <a href="#images" data-tab="images">Zdjęcia</a>
-      <a href="#performance" data-tab="performance">Wyniki kampanii</a>
-      <a href="#feed-health" data-tab="feed-health">Sklep</a>
-      <a href="#history" data-tab="history">Kronika zmian</a>
-      <a href="#add-variant" data-tab="add-variant" class="primary">+ Nowy pomysł</a>
+      <a href="#today" data-tab="today">Dziś</a>
+      <a href="#tests" data-tab="tests">Testy</a>
+      <a href="#ideas" data-tab="ideas">Pomysły</a>
+      <a href="#shop" data-tab="shop">Sklep</a>
     </div>
   </nav>
 
   <div id="health-banner-container"></div>
   <main>
-    <!-- TODAY -->
+    <!-- DZIŚ -->
     <section id="section-today" class="section">
       <div class="section-header">
         <h1 class="section-title">Dzień dobry, <em>Marcin</em></h1>
@@ -55,135 +51,118 @@
       </div>
     </section>
 
-    <!-- RULES -->
-    <section id="section-rules" class="section">
+    <!-- TESTY (unified: title + description + image) -->
+    <section id="section-tests" class="section">
       <div class="section-header">
-        <h1 class="section-title">Twoje <em>testy tytułów</em></h1>
-        <div class="section-sub">Każdy test podmienia kawałek tytułu w wybranej grupie produktów i wpuszcza ich kopie do Google Shopping. Kliknij wiersz, żeby edytować — albo pauzować jednym kliknięciem.</div>
+        <h1 class="section-title">Twoje <em>testy</em></h1>
+        <div class="section-sub">Tytuły, opisy i zdjęcia — wszystko w jednym miejscu. Kliknij wiersz, żeby zobaczyć szczegóły. Pauza/edycja przez panel po prawej.</div>
       </div>
+
+      <!-- Action bar: filters + add new -->
+      <div class="tests-toolbar" id="tests-toolbar">
+        <div class="tests-filters">
+          <button class="filter-chip active" data-filter="all">Wszystko</button>
+          <button class="filter-chip" data-filter="title">Tytuły (T)</button>
+          <button class="filter-chip" data-filter="description">Opisy (D)</button>
+          <button class="filter-chip" data-filter="both">Tytuł+Opis (T+D)</button>
+          <button class="filter-chip" data-filter="image">Zdjęcia (I)</button>
+        </div>
+        <button class="btn" id="add-test-btn" style="padding:9px 16px;">+ Nowy test</button>
+      </div>
+
       <div class="card">
         <div class="card-header">
-          <div class="card-title" id="rules-count">Wczytuję testy…</div>
-          <a class="pill pill-info mono" id="rules-source-link" target="_blank" rel="noopener">otwórz w GitHubie</a>
+          <div class="card-title" id="tests-count">Wczytuję testy…</div>
+          <a class="pill pill-info mono" id="tests-source-link" target="_blank" rel="noopener">otwórz w GitHubie</a>
         </div>
-        <div id="rules-table-wrap">
+        <div id="tests-table-wrap">
           <div class="loading">Wczytuję Twoje testy…</div>
         </div>
       </div>
     </section>
 
-    <!-- HYPOTHESES -->
-    <section id="section-hypotheses" class="section">
+    <!-- POMYSŁY (hypotheses + add variant inline) -->
+    <section id="section-ideas" class="section">
       <div class="section-header">
         <h1 class="section-title">Co warto <em>spróbować</em></h1>
-        <div class="section-sub" id="hyp-subtitle">Pomysły na podstawie tego, co dzieje się w Twoich reklamach. Czerwone = warto pochylić się dziś, żółte = w tym tygodniu, reszta = jak będzie czas.</div>
+        <div class="section-sub" id="ideas-subtitle">Pomysły na podstawie tego, co dzieje się w Twoich reklamach. Czerwone = warto pochylić się dziś, żółte = w tym tygodniu, reszta = jak będzie czas.</div>
       </div>
-      <div id="hyp-content">
+      <div id="ideas-content">
         <div class="loading">Zastanawiam się…</div>
       </div>
     </section>
 
-    <!-- IMAGES -->
-    <section id="section-images" class="section">
+    <!-- SKLEP (performance + feed health + history) -->
+    <section id="section-shop" class="section">
       <div class="section-header">
-        <h1 class="section-title">Zdjęcia <em>w sklepie</em></h1>
-        <div class="section-sub">Każdy produkt ma kilka zdjęć, ale Google Shopping pokazuje tylko jedno. Kliknij produkt, zobacz całą galerię, wybierz inne jako główne — sprawdź, czy nie pociągnie więcej kliknięć.</div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title" id="images-count">Wczytuję produkty…</div>
-          <div class="flex-gap-1">
-            <input type="search" id="images-search" placeholder="Szukaj — wpisz nazwę albo numer" style="width:280px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);" />
-            <button class="btn" id="images-search-btn" style="padding:8px 16px;">Szukaj</button>
-          </div>
-        </div>
-        <div id="images-grid">
-          <div class="loading">Wczytuję produkty…</div>
-        </div>
-        <div id="images-pagination" class="flex-between" style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border);"></div>
+        <h1 class="section-title">Twój <em>sklep</em></h1>
+        <div class="section-sub">Wyniki kampanii, stan sklepu w Google i historia wszystkich zmian.</div>
       </div>
 
-      <div class="card" id="images-detail" style="margin-top:22px;display:none;">
-        <div class="card-header">
-          <div>
-            <div class="card-title" id="detail-title">—</div>
-            <div class="card-sub mono" id="detail-meta">—</div>
-          </div>
-          <button class="btn" id="detail-close" style="padding:7px 14px;background:var(--card-hover);color:var(--text);">Zamknij</button>
-        </div>
-        <div id="detail-gallery"></div>
-        <div id="detail-preview" style="margin-top:18px;"></div>
+      <!-- Subnav: performance | health | history -->
+      <div class="subtabs">
+        <a class="subtab active" href="#shop/perf" data-subtab="perf">Wyniki kampanii</a>
+        <a class="subtab" href="#shop/health" data-subtab="health">Stan sklepu</a>
+        <a class="subtab" href="#shop/history" data-subtab="history">Historia zmian</a>
       </div>
-    </section>
 
-    <!-- PERFORMANCE -->
-    <section id="section-performance" class="section">
-      <div class="section-header">
-        <h1 class="section-title">Wyniki <em>kampanii</em></h1>
-        <div class="section-sub" id="perf-subtitle">Wczytuję najnowsze liczby z Twojego konta Google Ads…</div>
-      </div>
-      <div id="perf-diagnosis-banner"></div>
-      <div class="kpi-strip" id="perf-summary"></div>
-      <div class="card mb-2">
-        <div class="card-header">
-          <div>
-            <div class="card-title" id="perf-campaigns-title">Twoje kampanie (ostatni miesiąc)</div>
-            <div class="card-sub" id="perf-campaigns-sub">—</div>
+      <!-- Performance subsection -->
+      <div id="shop-perf" class="subsection">
+        <div id="perf-diagnosis-banner"></div>
+        <div class="kpi-strip" id="perf-summary"></div>
+        <div class="card mb-2">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="perf-campaigns-title">Twoje kampanie (ostatni miesiąc)</div>
+              <div class="card-sub" id="perf-campaigns-sub">—</div>
+            </div>
+          </div>
+          <div id="perf-campaigns-table">
+            <div class="loading">Wczytuję…</div>
           </div>
         </div>
-        <div id="perf-campaigns-table">
-          <div class="loading">Wczytuję…</div>
-        </div>
-      </div>
-      <div class="card" id="perf-actions-card" style="display:none;">
-        <div class="card-header">
-          <div class="card-title">Co z tym zrobić</div>
-          <div class="card-sub">Konkretne kroki z diagnozy powyżej</div>
-        </div>
-        <div id="perf-actions"></div>
-      </div>
-    </section>
-
-    <!-- FEED HEALTH -->
-    <section id="section-feed-health" class="section">
-      <div class="section-header">
-        <h1 class="section-title">Twój <em>sklep w Google</em></h1>
-        <div class="section-sub">Sklep aktualizuje się sam co godzinę. Jeśli chcesz przyspieszyć — kliknij „Odśwież teraz". Poniżej zobaczysz, kiedy ostatnio się aktualizował i co się zmieniło.</div>
-      </div>
-      <div class="card mb-2">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Ręczne odświeżenie</div>
-            <div class="card-sub">Wymusza aktualizację sklepu poza zwykłym harmonogramem (co godzinę)</div>
+        <div class="card" id="perf-actions-card" style="display:none;">
+          <div class="card-header">
+            <div class="card-title">Co z tym zrobić</div>
+            <div class="card-sub">Konkretne kroki z diagnozy powyżej</div>
           </div>
-          <button class="btn" id="regenerate-btn" style="padding:11px 18px;">⟳ Odśwież teraz</button>
-        </div>
-        <div id="regenerate-status" class="alert"></div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Aktualny stan</div>
-          <div class="card-sub" id="feed-health-fetched-at"></div>
-        </div>
-        <div id="feed-health-body">
-          <div class="loading">Sprawdzam…</div>
+          <div id="perf-actions"></div>
         </div>
       </div>
-    </section>
 
-    <!-- HISTORY -->
-    <section id="section-history" class="section">
-      <div class="section-header">
-        <h1 class="section-title">Kronika <em>zmian</em></h1>
-        <div class="section-sub">Lista wszystkiego, co działo się z Twoimi testami — kto, kiedy, co. Klikalna do szczegółów w GitHubie.</div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title" id="history-count">Wczytuję historię…</div>
-          <a class="pill pill-info mono" id="history-github-link" target="_blank" rel="noopener">otwórz w GitHubie</a>
+      <!-- Feed Health subsection -->
+      <div id="shop-health" class="subsection" style="display:none;">
+        <div class="card mb-2">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Ręczne odświeżenie</div>
+              <div class="card-sub">Wymusza aktualizację sklepu poza zwykłym harmonogramem (co godzinę)</div>
+            </div>
+            <button class="btn" id="regenerate-btn" style="padding:11px 18px;">⟳ Odśwież teraz</button>
+          </div>
+          <div id="regenerate-status" class="alert"></div>
         </div>
-        <div id="history-content">
-          <div class="loading">Wczytuję historię zmian…</div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Aktualny stan</div>
+            <div class="card-sub" id="feed-health-fetched-at"></div>
+          </div>
+          <div id="feed-health-body">
+            <div class="loading">Sprawdzam…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History subsection -->
+      <div id="shop-history" class="subsection" style="display:none;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title" id="history-count">Wczytuję historię…</div>
+            <a class="pill pill-info mono" id="history-github-link" target="_blank" rel="noopener">otwórz w GitHubie</a>
+          </div>
+          <div id="history-content">
+            <div class="loading">Wczytuję historię zmian…</div>
+          </div>
         </div>
       </div>
     </section>
@@ -201,29 +180,70 @@
       <div class="side-panel-body">
         <div id="sp-impact-banner" style="margin-bottom:18px;"></div>
 
+        <!-- Test type selector -->
+        <div class="field">
+          <label>Typ testu</label>
+          <div class="test-type-radios" id="sp-test-type-radios">
+            <label class="test-type-radio">
+              <input type="radio" name="sp-testType" value="title" />
+              <span class="tt-pill">T</span>
+              <div class="tt-label">
+                <div class="tt-name">Tytuł</div>
+                <div class="tt-hint">Podmienia frazę tylko w tytule (jak dotąd)</div>
+              </div>
+            </label>
+            <label class="test-type-radio">
+              <input type="radio" name="sp-testType" value="description" />
+              <span class="tt-pill">D</span>
+              <div class="tt-label">
+                <div class="tt-name">Opis</div>
+                <div class="tt-hint">Tytuł bez zmian, ta sama fraza zastępowana w opisie</div>
+              </div>
+            </label>
+            <label class="test-type-radio">
+              <input type="radio" name="sp-testType" value="both" />
+              <span class="tt-pill">T+D</span>
+              <div class="tt-label">
+                <div class="tt-name">Tytuł + Opis</div>
+                <div class="tt-hint">Podmiana w obu miejscach jednocześnie</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
         <div class="field">
           <label for="sp-matchInTitle">Których produktów to dotyczy</label>
           <input type="text" id="sp-matchInTitle" />
           <div class="hint">Słowo które musi pojawić się w tytule produktu (np. <strong>GARDEN LINE</strong>) — wielkość liter nie ma znaczenia.</div>
         </div>
 
-        <div class="field">
-          <label for="sp-searchInTitle">Co podmienić w tytule</label>
+        <div class="field" id="sp-search-field">
+          <label for="sp-searchInTitle">Co podmienić</label>
           <input type="text" id="sp-searchInTitle" />
-          <div class="hint">Tekst który chcesz zastąpić. <strong>Uważaj:</strong> zmiana tego pola zaczyna nowy test od zera — stare statystyki w Google Ads stracą sens.</div>
+          <div class="hint">Tekst który chcesz zastąpić. Dla typu „Opis" — ta fraza zostanie zastąpiona wszystkimi wystąpieniami w opisie produktu. <strong>Uważaj:</strong> zmiana tego pola zaczyna nowy test od zera — stare statystyki w Google Ads stracą sens.</div>
         </div>
 
-        <div class="field">
+        <div class="field" id="sp-replace-field">
           <label for="sp-replaceWith">Czym to podmienić</label>
           <input type="text" id="sp-replaceWith" />
           <div class="hint">Pisz jak chcesz — wynikowy tytuł i tak będzie miał każde słowo z dużej litery (bez krzyczących CAPS-ów).</div>
           <div id="sp-replace-preview" class="text-dim mono" style="margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12.5px;min-height:30px;">—</div>
         </div>
 
+        <!-- Description override (shown only for description/both) -->
+        <div class="field" id="sp-desc-override-field" style="display:none;">
+          <label for="sp-descriptionOverride">Nowy opis (zamiast podmiany)</label>
+          <textarea id="sp-descriptionOverride" rows="4" maxlength="4950" placeholder="Zostaw puste → użyję podmiany powyżej. Wpisz pełny opis → użyję go zamiast oryginalnego."></textarea>
+          <div class="hint">
+            <strong>Opcjonalne.</strong> Jeśli zostawisz puste — system zastąpi frazę z pola „Co podmienić" w opisie (globalnie, każde wystąpienie). Jeśli wpiszesz — użyje tego opisu w całości. Max 4950 znaków (limit Google PLA 5000).
+            <span class="text-muted" id="sp-desc-counter" style="margin-left:8px;">0 / 4950</span>
+          </div>
+        </div>
+
         <div class="field">
           <label for="sp-dupSuffix">Krótki kod testu</label>
           <input type="text" id="sp-dupSuffix" pattern="[a-z0-9]+" maxlength="10" />
-          <div class="hint">Małe litery i cyfry (np. <strong>t8</strong>). To po nim rozpoznasz wariant w raportach Google Ads. <strong>Uważaj:</strong> zmiana zerwie historię — jeśli to nowy pomysł, lepiej zrób nowy test, zostaw stary.</div>
+          <div class="hint">Małe litery i cyfry (np. <strong>t8</strong>, <strong>d1</strong>, <strong>b1</strong>). To po nim rozpoznasz wariant w raportach Google Ads. Konwencja: <em>t</em>=tytuł, <em>d</em>=opis, <em>b</em>=both. <strong>Uważaj:</strong> zmiana zerwie historię — jeśli to nowy pomysł, lepiej zrób nowy test, zostaw stary.</div>
         </div>
 
         <div class="field">
@@ -243,7 +263,7 @@
           <span class="text-muted mono" style="font-size:11px;" id="sp-sample-count">—</span>
         </div>
         <div id="sp-samples">
-          <div class="text-muted" style="font-size:13px;font-style:italic;">Wpisz pola powyżej, a pokażę 3 przykładowe produkty z nowym tytułem…</div>
+          <div class="text-muted" style="font-size:13px;font-style:italic;">Wpisz pola powyżej, a pokażę 3 przykładowe produkty z nowym tytułem/opisem…</div>
         </div>
 
         <details style="margin-top:22px;">
@@ -258,44 +278,87 @@
       </div>
     </aside>
 
-    <!-- NOWY POMYSŁ (legacy form, działa równolegle z side-panel edycją) -->
-    <section id="section-add-variant" class="section">
-      <div class="section-header">
-        <h1 class="section-title">Nowy <em>pomysł</em></h1>
-        <div class="section-sub">Wpadł Ci do głowy nowy tytuł do przetestowania? Wpisz go tutaj — wjedzie do sklepu w ciągu godziny. Możesz dodać też z telefonu.</div>
+    <!-- ADD TEST PANEL (slides from right, like edit) -->
+    <aside class="side-panel" id="add-panel" aria-hidden="true">
+      <div class="side-panel-header">
+        <div>
+          <div class="card-title">Nowy test</div>
+          <div class="card-sub">Tytuł, opis lub jedno i drugie</div>
+        </div>
+        <button class="btn btn-secondary" id="add-close" style="padding:7px 14px;">Zamknij</button>
       </div>
-      <div class="card form-card">
-        <div id="alert" class="alert"></div>
-        <form id="variant-form">
+      <div class="side-panel-body">
+        <div id="add-alert" class="alert"></div>
+        <form id="add-test-form">
           <div class="field">
-            <label for="matchInTitle">Których produktów to dotyczy</label>
-            <input type="text" id="matchInTitle" name="matchInTitle" placeholder="np. GARDEN LINE" required />
+            <label>Typ testu</label>
+            <div class="test-type-radios">
+              <label class="test-type-radio">
+                <input type="radio" name="add-testType" value="title" checked />
+                <span class="tt-pill">T</span>
+                <div class="tt-label">
+                  <div class="tt-name">Tytuł</div>
+                  <div class="tt-hint">Podmienia frazę w tytule</div>
+                </div>
+              </label>
+              <label class="test-type-radio">
+                <input type="radio" name="add-testType" value="description" />
+                <span class="tt-pill">D</span>
+                <div class="tt-label">
+                  <div class="tt-name">Opis</div>
+                  <div class="tt-hint">Podmienia w opisie, tytuł bez zmian</div>
+                </div>
+              </label>
+              <label class="test-type-radio">
+                <input type="radio" name="add-testType" value="both" />
+                <span class="tt-pill">T+D</span>
+                <div class="tt-label">
+                  <div class="tt-name">Tytuł + Opis</div>
+                  <div class="tt-hint">Podmiana w obu polach</div>
+                </div>
+              </label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="add-matchInTitle">Których produktów to dotyczy</label>
+            <input type="text" id="add-matchInTitle" placeholder="np. GARDEN LINE" required />
             <div class="hint">Słowo które musi pojawić się w tytule produktu. Wielkość liter nie ma znaczenia.</div>
           </div>
           <div class="field">
-            <label for="searchInTitle">Co podmienić w tytule</label>
-            <input type="text" id="searchInTitle" name="searchInTitle" placeholder="np. ZASŁONA NA TARAS" required />
-            <div class="hint">Tekst który chcesz zastąpić.</div>
+            <label for="add-searchInTitle">Co podmienić</label>
+            <input type="text" id="add-searchInTitle" placeholder="np. ZASŁONA NA TARAS" required />
+            <div class="hint">Tekst który chcesz zastąpić (w tytule i/lub opisie).</div>
           </div>
           <div class="field">
-            <label for="replaceWith">Czym to podmienić</label>
-            <input type="text" id="replaceWith" name="replaceWith" placeholder="np. Zasłona do altany" required />
+            <label for="add-replaceWith">Czym to podmienić</label>
+            <input type="text" id="add-replaceWith" placeholder="np. Zasłona wodoodporna" required />
             <div class="hint">Pisz jak chcesz — wynikowy tytuł i tak będzie miał każde słowo z dużej litery. Podgląd poniżej:</div>
-            <div id="replace-preview" class="text-dim mono" style="margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12.5px;min-height:30px;">—</div>
+            <div id="add-replace-preview" class="text-dim mono" style="margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12.5px;min-height:30px;">—</div>
+          </div>
+          <div class="field" id="add-desc-override-field" style="display:none;">
+            <label for="add-descriptionOverride">Nowy opis (opcjonalne — zamiast podmiany)</label>
+            <textarea id="add-descriptionOverride" rows="4" maxlength="4950" placeholder="Zostaw puste → użyję podmiany. Wpisz → użyję tego opisu w całości."></textarea>
+            <div class="hint">
+              <strong>Opcjonalne.</strong> Max 4950 znaków.
+              <span class="text-muted" id="add-desc-counter" style="margin-left:8px;">0 / 4950</span>
+            </div>
           </div>
           <div class="field">
-            <label for="dupSuffix">Krótki kod testu</label>
-            <input type="text" id="dupSuffix" name="dupSuffix" placeholder="np. t8" required pattern="[a-z0-9]+" maxlength="10" />
-            <div class="hint">Małe litery i cyfry (max 10 znaków). Po tym kodzie rozpoznasz wariant w raportach Google Ads.</div>
+            <label for="add-dupSuffix">Krótki kod testu</label>
+            <input type="text" id="add-dupSuffix" placeholder="np. t8, d1, b1" required pattern="[a-z0-9]+" maxlength="10" />
+            <div class="hint">Małe litery i cyfry (max 10 znaków). Konwencja: <em>t</em>=tytuł, <em>d</em>=opis, <em>b</em>=oba. Po tym kodzie rozpoznasz wariant w raportach Google Ads.</div>
           </div>
           <div class="field">
-            <label for="notes">Notatka (możesz pominąć)</label>
-            <textarea id="notes" name="notes" placeholder="Po co testujesz? Co chcesz sprawdzić?"></textarea>
+            <label for="add-notes">Notatka (możesz pominąć)</label>
+            <textarea id="add-notes" rows="2" placeholder="Po co testujesz? Co chcesz sprawdzić?"></textarea>
           </div>
-          <button type="submit" id="submit-btn" class="btn btn-block">Dodaj nowy test</button>
         </form>
       </div>
-    </section>
+      <div class="side-panel-footer">
+        <button type="button" class="btn btn-secondary" id="add-cancel">Anuluj</button>
+        <button type="submit" id="add-submit" class="btn" form="add-test-form">Dodaj test</button>
+      </div>
+    </aside>
   </main>
 
   <footer>
