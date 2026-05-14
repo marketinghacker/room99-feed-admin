@@ -101,9 +101,15 @@ export default async function handler(req, res) {
         return {
           status: 403,
           json: {
-            error: 'PAT scope insufficient — need Contents: Read and write on room99-feed-duplicator.',
+            error: 'GITHUB_TOKEN w Vercel ma tylko Contents:Read — potrzebuję Contents:Read+Write żeby zapisać zmianę reguły.',
             github_message: details.message,
-            docs: 'Update GITHUB_TOKEN in Vercel env vars with Contents:R/W scope, then redeploy.',
+            fix: {
+              step_1: 'Wygeneruj nowy fine-grained PAT: https://github.com/settings/personal-access-tokens/new',
+              step_2: 'Repository: marketinghacker/room99-feed-duplicator',
+              step_3: 'Permissions: Contents R/W + Issues R/W + Actions R/W + Metadata Read',
+              step_4: 'Update GITHUB_TOKEN w Vercel: https://vercel.com/marketinghacker/room99-feed-admin/settings/environment-variables',
+              step_5: 'Redeploy: Deployments → najnowszy → ⋮ → Redeploy',
+            },
           },
         };
       }

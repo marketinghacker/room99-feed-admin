@@ -620,6 +620,23 @@ async function runImpactCheck() {
   document.getElementById('sp-save').title = errorsCount > 0 ? 'Resolve errors first' : '';
 }
 
+function format403Help(j) {
+  if (!j.fix) return escapeHTML(j.error || 'unknown');
+  return `
+    <strong>${escapeHTML(j.error)}</strong><br>
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer;font-weight:600;">Jak naprawić (krok po kroku) ▾</summary>
+      <ol style="margin:6px 0 0 18px;font-size:12px;line-height:1.6;">
+        <li><a href="${escapeHTML(j.fix.step_1.split(': ')[1])}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Generate fine-grained PAT →</a></li>
+        <li>${escapeHTML(j.fix.step_2)}</li>
+        <li>${escapeHTML(j.fix.step_3)}</li>
+        <li><a href="${escapeHTML(j.fix.step_4.split(': ')[1])}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Update GITHUB_TOKEN in Vercel →</a></li>
+        <li>${escapeHTML(j.fix.step_5)}</li>
+      </ol>
+    </details>
+  `;
+}
+
 async function saveSidePanelChanges() {
   if (!sp.current) return;
   const id = sp.original.id;
@@ -648,13 +665,17 @@ async function saveSidePanelChanges() {
       closeSidePanel();
       await reloadConfig();
       renderRules();
+    } else if (r.status === 403 && j.fix) {
+      showToast(format403Help(j), 'error');
+      btn.disabled = false;
+      btn.textContent = 'Zapisz';
     } else {
-      showToast('Błąd: ' + (j.error || 'unknown'), 'error');
+      showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
       btn.disabled = false;
       btn.textContent = 'Zapisz';
     }
   } catch (e) {
-    showToast('Błąd sieci: ' + e.message, 'error');
+    showToast('Błąd sieci: ' + escapeHTML(e.message), 'error');
     btn.disabled = false;
     btn.textContent = 'Zapisz';
   }
