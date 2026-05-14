@@ -340,9 +340,9 @@ async function renderRules() {
       </td>
       <td>${campaignCell}</td>
       <td>
-        <button class="pill status-toggle ${r.active ? 'pill-success' : 'pill-muted'}" data-toggle-rule="${escapeHTML(r.id)}" data-current="${r.active ? 'true' : 'false'}" title="Klik aby ${r.active ? 'spauzować' : 'wznowić'}">
+        <span class="pill ${r.active ? 'pill-success' : 'pill-muted'}" title="${r.active ? 'Test biegnie — żeby spauzować, kliknij wiersz i wybierz „Pauza" w panelu' : 'Test na pauzie — żeby wznowić, kliknij wiersz i wybierz „Wznów" w panelu'}" style="cursor:default;user-select:none;">
           ${r.active ? 'biegnie' : 'pauza'}
-        </button>
+        </span>
       </td>
       <td>
         <button class="pill pill-info edit-rule-btn" data-edit-rule="${escapeHTML(r.id)}" style="border:none;cursor:pointer;">Edytuj →</button>
@@ -380,39 +380,9 @@ async function renderRules() {
   document.querySelectorAll('.rules-row').forEach((row) => {
     row.addEventListener('click', () => openSidePanelEditor(row.dataset.ruleId));
   });
-  document.querySelectorAll('.status-toggle').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const ruleId = btn.dataset.toggleRule;
-      const currentActive = btn.dataset.current === 'true';
-      btn.disabled = true;
-      btn.textContent = '…';
-      try {
-        const r = await fetch('/api/rules/' + encodeURIComponent(ruleId), {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'toggle' }),
-        });
-        const j = await r.json();
-        if (r.ok || r.status === 202) {
-          showSaveSuccess(`${ruleId} → ${currentActive ? 'inactive' : 'active'}`, j);
-          await reloadConfig();
-          renderRules();
-        } else if (r.status === 403 && j.fix) {
-          showToast(format403Help(j), 'error');
-          btn.disabled = false;
-          btn.textContent = currentActive ? 'active' : 'inactive';
-        } else {
-          showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
-          btn.disabled = false;
-          btn.textContent = currentActive ? 'active' : 'inactive';
-        }
-      } catch (err) {
-        showToast('Błąd sieci: ' + escapeHTML(err.message), 'error');
-        btn.disabled = false;
-      }
-    });
-  });
+  // Pill "biegnie/pauza" jest teraz pure display — toggle dostępny tylko
+  // w side-panel (klik wiersza → Pauza/Wznów button). Marcin omyłkowo
+  // kliknął "biegnie" myśląc że to status, więc zabieram inline toggle.
 
   // Fire match-count fetches in parallel (lightweight — server caches FO feed)
   rules.forEach((r) => {
