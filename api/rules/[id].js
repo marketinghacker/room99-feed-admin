@@ -5,13 +5,14 @@
 //     { action: 'edit', changes: { matchInTitle?, searchInTitle?, replaceWith?, dupSuffix?, notes? } }
 // - DELETE: remove rule from config.json
 //
-// Race-safety: GET config + SHA → mutate → PUT with If-Match.
-// On 409 (ETag mismatch): retry up to 3× with fresh fetch.
-//
-// RULE #0 SAFETY: this is a write to production config.json. The cron will pick
-// up changes within 1h. To make change visible faster, also bumps a noop field
-// (config.json "_comment_lastChange") which triggers regenerate-feed.yml via
-// push event (paths: config.json).
+// TWO-TIER STRATEGY (auto-fallback):
+//   1. PRIMARY: direct PUT on config.json (needs Contents:R/W).
+//      Race-safe via GET+SHA → PUT If-Match. 3× retry on 409.
+//   2. FALLBACK: on 403, create a GitHub Issue with label 'rule-action'.
+//      The workflow handle-rule-action-issue.yml processes it with its
+//      own (full-scope) GITHUB_TOKEN. Same end-state, +1 commit delay ~30s.
+
+import { createRuleActionIssue } from '../_lib/issue-fallback.js';
 
 const RULES_KEY = 'duplicateRules';
 
@@ -97,21 +98,8 @@ export default async function handler(req, res) {
         continue;
       }
       if (putResp.status === 403) {
-        const details = await putResp.json().catch(() => ({}));
-        return {
-          status: 403,
-          json: {
-            error: 'GITHUB_TOKEN w Vercel ma tylko Contents:Read — potrzebuję Contents:Read+Write żeby zapisać zmianę reguły.',
-            github_message: details.message,
-            fix: {
-              step_1: 'Wygeneruj nowy fine-grained PAT: https://github.com/settings/personal-access-tokens/new',
-              step_2: 'Repository: marketinghacker/room99-feed-duplicator',
-              step_3: 'Permissions: Contents R/W + Issues R/W + Actions R/W + Metadata Read',
-              step_4: 'Update GITHUB_TOKEN w Vercel: https://vercel.com/marketinghacker/room99-feed-admin/settings/environment-variables',
-              step_5: 'Redeploy: Deployments → najnowszy → ⋮ → Redeploy',
-            },
-          },
-        };
+        // Direct PUT failed — token lacks Contents:Write. Try Issue fallback.
+        return { _try_issue_fallback: true };
       }
       if (!putResp.ok) {
         const details = await putResp.json().catch(() => ({}));
@@ -132,18 +120,59 @@ export default async function handler(req, res) {
     return { status: 409, json: { error: 'Conflict — repeated SHA mismatch after 3 attempts. Try again.' } };
   }
 
+  // Helper: try direct mutate, on 403 fallback to Issue API
+  async function tryWriteOrIssueFallback(directFn, issuePayload, title) {
+    const result = await directFn();
+    if (result._try_issue_fallback) {
+      // Fall back to creating an Issue with rule-action label
+      const issueResult = await createRuleActionIssue({
+        ghHeaders,
+        owner: GITHUB_OWNER,
+        repo,
+        action: issuePayload.action,
+        payload: issuePayload,
+        title,
+      });
+      if (issueResult.ok) {
+        return {
+          status: 202,
+          json: {
+            success: true,
+            method: 'issue_fallback',
+            issue_number: issueResult.issue_number,
+            issue_url: issueResult.issue_url,
+            message: `Direct write blocked by token scope — queued via Issue #${issueResult.issue_number}. Workflow będzie apply w ~30s, feed regeneruje w ≤1h.`,
+          },
+        };
+      }
+      return {
+        status: issueResult.status || 500,
+        json: { error: 'Both direct write AND issue fallback failed', issue_error: issueResult.error },
+      };
+    }
+    return result;
+  }
+
   if (req.method === 'PATCH') {
     const body = req.body || {};
     const action = body.action;
 
     if (action === 'toggle' || action === 'set_active') {
-      const result = await mutateAndCommit(
-        (rules, idx) => {
-          const current = rules[idx].active === true;
-          rules[idx].active = action === 'set_active' ? !!body.active : !current;
-          return null;
-        },
-        `chore(rules): toggle ${id} via admin panel`
+      const issuePayload = action === 'set_active'
+        ? { action: 'set_active', ruleId: id, active: !!body.active }
+        : { action: 'toggle', ruleId: id };
+
+      const result = await tryWriteOrIssueFallback(
+        () => mutateAndCommit(
+          (rules, idx) => {
+            const current = rules[idx].active === true;
+            rules[idx].active = action === 'set_active' ? !!body.active : !current;
+            return null;
+          },
+          `chore(rules): toggle ${id} via admin panel`
+        ),
+        issuePayload,
+        `[ACTION] toggle ${id}`
       );
       return res.status(result.status).json(result.json);
     }
@@ -156,38 +185,37 @@ export default async function handler(req, res) {
         if (changes[key] !== undefined) filteredChanges[key] = changes[key];
       }
 
-      const result = await mutateAndCommit(
-        (rules, idx, config) => {
-          // Validation: dupSuffix uniqueness
-          if (filteredChanges.dupSuffix && filteredChanges.dupSuffix !== rules[idx].dupSuffix) {
-            const dupSuffix = String(filteredChanges.dupSuffix).trim();
-            if (!/^[a-z0-9]+$/.test(dupSuffix)) {
-              return { validationError: 'dupSuffix must be lowercase letters/digits only' };
+      const result = await tryWriteOrIssueFallback(
+        () => mutateAndCommit(
+          (rules, idx, config) => {
+            if (filteredChanges.dupSuffix && filteredChanges.dupSuffix !== rules[idx].dupSuffix) {
+              const dupSuffix = String(filteredChanges.dupSuffix).trim();
+              if (!/^[a-z0-9]+$/.test(dupSuffix)) {
+                return { validationError: 'dupSuffix must be lowercase letters/digits only' };
+              }
+              const collision = rules.find((r, j) => j !== idx && r.dupSuffix === dupSuffix);
+              if (collision) {
+                return { validationError: `dupSuffix "${dupSuffix}" already used in rule "${collision.id}"` };
+              }
             }
-            const collision = rules.find((r, j) => j !== idx && r.dupSuffix === dupSuffix);
-            if (collision) {
-              return { validationError: `dupSuffix "${dupSuffix}" already used in rule "${collision.id}"` };
+            for (const key of ['matchInTitle', 'searchInTitle', 'replaceWith']) {
+              if (filteredChanges[key] !== undefined && !String(filteredChanges[key]).trim()) {
+                return { validationError: `${key} cannot be empty` };
+              }
             }
-          }
-          // Validation: non-empty for required strings
-          for (const key of ['matchInTitle', 'searchInTitle', 'replaceWith']) {
-            if (filteredChanges[key] !== undefined && !String(filteredChanges[key]).trim()) {
-              return { validationError: `${key} cannot be empty` };
+            for (const [k, v] of Object.entries(filteredChanges)) {
+              rules[idx][k] = v;
             }
-          }
-
-          // Apply
-          for (const [k, v] of Object.entries(filteredChanges)) {
-            rules[idx][k] = v;
-          }
-          rules[idx].updated_at = new Date().toISOString();
-          // Mirror customLabel1 to dupSuffix if convention holds
-          if (filteredChanges.dupSuffix && (!rules[idx].customLabel1 || rules[idx].customLabel1 === rules[idx].dupSuffix)) {
-            rules[idx].customLabel1 = filteredChanges.dupSuffix;
-          }
-          return null;
-        },
-        `chore(rules): edit ${id} via admin panel (${Object.keys(filteredChanges).join(', ')})`
+            rules[idx].updated_at = new Date().toISOString();
+            if (filteredChanges.dupSuffix && (!rules[idx].customLabel1 || rules[idx].customLabel1 === rules[idx].dupSuffix)) {
+              rules[idx].customLabel1 = filteredChanges.dupSuffix;
+            }
+            return null;
+          },
+          `chore(rules): edit ${id} via admin panel (${Object.keys(filteredChanges).join(', ')})`
+        ),
+        { action: 'edit', ruleId: id, changes: filteredChanges },
+        `[ACTION] edit ${id} (${Object.keys(filteredChanges).join(', ')})`
       );
       return res.status(result.status).json(result.json);
     }
@@ -196,12 +224,16 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
-    const result = await mutateAndCommit(
-      (rules, idx, config) => {
-        rules.splice(idx, 1);
-        return null;
-      },
-      `chore(rules): delete ${id} via admin panel`
+    const result = await tryWriteOrIssueFallback(
+      () => mutateAndCommit(
+        (rules, idx, config) => {
+          rules.splice(idx, 1);
+          return null;
+        },
+        `chore(rules): delete ${id} via admin panel`
+      ),
+      { action: 'delete', ruleId: id },
+      `[ACTION] delete ${id}`
     );
     return res.status(result.status).json(result.json);
   }

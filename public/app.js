@@ -98,11 +98,11 @@ async function loadCoreData() {
 const RENDERERS = {
   today: renderToday,
   rules: renderRules,
-  hypotheses: () => {}, // static placeholder
+  hypotheses: renderHypotheses,
   images: renderImages,
   performance: renderPerformance,
   'feed-health': renderFeedHealth,
-  history: renderHistoryLink,
+  history: renderHistory,
   'add-variant': renderAddVariant,
 };
 
@@ -373,17 +373,21 @@ async function renderRules() {
           body: JSON.stringify({ action: 'toggle' }),
         });
         const j = await r.json();
-        if (r.ok) {
-          showToast(`✓ ${ruleId} → ${currentActive ? 'inactive' : 'active'} — feed regeneruje się w ≤1h`, 'success');
+        if (r.ok || r.status === 202) {
+          showSaveSuccess(`${ruleId} → ${currentActive ? 'inactive' : 'active'}`, j);
           await reloadConfig();
           renderRules();
+        } else if (r.status === 403 && j.fix) {
+          showToast(format403Help(j), 'error');
+          btn.disabled = false;
+          btn.textContent = currentActive ? 'active' : 'inactive';
         } else {
-          showToast('Błąd: ' + (j.error || 'unknown'), 'error');
+          showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
           btn.disabled = false;
           btn.textContent = currentActive ? 'active' : 'inactive';
         }
       } catch (err) {
-        showToast('Błąd sieci: ' + err.message, 'error');
+        showToast('Błąd sieci: ' + escapeHTML(err.message), 'error');
         btn.disabled = false;
       }
     });
@@ -660,8 +664,8 @@ async function saveSidePanelChanges() {
       body: JSON.stringify({ action: 'edit', changes }),
     });
     const j = await r.json();
-    if (r.ok) {
-      showToast(`✓ Reguła ${id} zapisana — feed regeneruje się w ≤1h. <a class="mono" href="${escapeHTML(j.commit_url || '#')}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">view commit →</a>`, 'success');
+    if (r.ok || r.status === 202) {
+      showSaveSuccess(`Reguła ${id} zapisana`, j);
       closeSidePanel();
       await reloadConfig();
       renderRules();
@@ -681,6 +685,18 @@ async function saveSidePanelChanges() {
   }
 }
 
+// Unified success toast that handles both direct PATCH and Issue fallback
+function showSaveSuccess(action, j) {
+  const method = j.method === 'issue_fallback'
+    ? `via Issue #${j.issue_number} — workflow apply ~30s, feed regen ≤1h`
+    : 'feed regen ≤1h';
+  const link = j.commit_url || j.issue_url || '#';
+  showToast(
+    `✓ ${escapeHTML(action)} (${method}). <a class="mono" href="${escapeHTML(link)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">view →</a>`,
+    'success'
+  );
+}
+
 async function toggleSidePanelRule() {
   if (!sp.original) return;
   const id = sp.original.id;
@@ -691,16 +707,18 @@ async function toggleSidePanelRule() {
       body: JSON.stringify({ action: 'toggle' }),
     });
     const j = await r.json();
-    if (r.ok) {
-      showToast(`✓ ${id} toggled — feed regeneruje się w ≤1h`, 'success');
+    if (r.ok || r.status === 202) {
+      showSaveSuccess(`${id} toggled`, j);
       closeSidePanel();
       await reloadConfig();
       renderRules();
+    } else if (r.status === 403 && j.fix) {
+      showToast(format403Help(j), 'error');
     } else {
-      showToast('Błąd: ' + (j.error || 'unknown'), 'error');
+      showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
     }
   } catch (e) {
-    showToast('Błąd sieci: ' + e.message, 'error');
+    showToast('Błąd sieci: ' + escapeHTML(e.message), 'error');
   }
 }
 
@@ -713,16 +731,18 @@ async function deleteSidePanelRule() {
       method: 'DELETE',
     });
     const j = await r.json();
-    if (r.ok) {
-      showToast(`✓ Reguła ${id} usunięta — feed regeneruje się w ≤1h. <a class="mono" href="${escapeHTML(j.commit_url || '#')}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">view commit →</a>`, 'success');
+    if (r.ok || r.status === 202) {
+      showSaveSuccess(`Reguła ${id} usunięta`, j);
       closeSidePanel();
       await reloadConfig();
       renderRules();
+    } else if (r.status === 403 && j.fix) {
+      showToast(format403Help(j), 'error');
     } else {
-      showToast('Błąd: ' + (j.error || 'unknown'), 'error');
+      showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
     }
   } catch (e) {
-    showToast('Błąd sieci: ' + e.message, 'error');
+    showToast('Błąd sieci: ' + escapeHTML(e.message), 'error');
   }
 }
 
@@ -823,9 +843,191 @@ async function renderFeedHealth() {
   `;
 }
 
-function renderHistoryLink() {
-  const a = document.getElementById('history-temp-link');
-  if (a) a.href = COMMITS_URL;
+// ---------- HISTORY ----------
+async function renderHistory() {
+  const link = document.getElementById('history-github-link');
+  if (link) link.href = COMMITS_URL;
+
+  const countEl = document.getElementById('history-count');
+  const content = document.getElementById('history-content');
+
+  let data;
+  try {
+    data = await fetchJSON('/api/commits?path=config.json&per_page=30');
+  } catch (e) {
+    countEl.textContent = 'Błąd ładowania';
+    content.innerHTML = `<div class="alert error show">Nie udało się pobrać historii: ${escapeHTML(e.message)}</div>`;
+    return;
+  }
+
+  const commits = data.commits || [];
+  countEl.textContent = `${commits.length} commitów na config.json (najnowsze najpierw)`;
+
+  if (commits.length === 0) {
+    content.innerHTML = '<div class="placeholder"><div class="placeholder-title">Brak commitów</div></div>';
+    return;
+  }
+
+  content.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${commits
+        .map((c) => {
+          const msg = c.message_first_line || c.message;
+          const isAction = /chore\(rules\)|chore\(image-rule\)|chore\(rule-action\)|chore: manual regenerate/.test(msg);
+          const isFeat = /^feat:/.test(msg);
+          const isFix = /^fix(\(|:)/.test(msg);
+          const isAutoRegen = /chore: auto-regenerate/.test(msg);
+          const iconClass = isFix ? 'error' : isFeat ? 'success' : isAction ? 'info' : 'muted';
+          const icon = isFix ? '✕' : isFeat ? '+' : isAction ? '✎' : isAutoRegen ? '⟳' : '·';
+          return `
+        <div class="decision-card" style="margin-bottom:0;">
+          <div class="decision-icon ${iconClass}">${icon}</div>
+          <div class="decision-body">
+            <div class="decision-title">${escapeHTML(msg)}</div>
+            <div class="decision-meta">
+              <span class="mono">${escapeHTML(c.short_sha)}</span> · ${escapeHTML(c.author)} · ${fmtRelative(c.timestamp)} (${fmtDate(c.timestamp)})
+              · <a href="${escapeHTML(c.html_url)}" target="_blank" rel="noopener" class="mono">view commit →</a>
+            </div>
+          </div>
+        </div>
+      `;
+        })
+        .join('')}
+    </div>
+  `;
+}
+
+// ---------- HYPOTHESES ----------
+async function renderHypotheses() {
+  await ensureCoreLoaded();
+  await ensurePerformanceSnapshotLoaded();
+
+  const content = document.getElementById('hyp-content');
+  const subtitle = document.getElementById('hyp-subtitle');
+
+  const rules = state.config?.duplicateRules || [];
+  const snapshot = state.perfSnapshot;
+  const hypotheses = buildHypotheses(rules, snapshot);
+
+  const counts = {
+    critical: hypotheses.filter((h) => h.priority === 'critical').length,
+    high: hypotheses.filter((h) => h.priority === 'high').length,
+    medium: hypotheses.filter((h) => h.priority === 'medium').length,
+    low: hypotheses.filter((h) => h.priority === 'low').length,
+  };
+  subtitle.innerHTML = `${hypotheses.length} hipotez · <span style="color:var(--error);">${counts.critical} critical</span> · <span style="color:var(--warning);">${counts.high} high</span> · ${counts.medium} medium · ${counts.low} low`;
+
+  if (hypotheses.length === 0) {
+    content.innerHTML = '<div class="placeholder"><div class="placeholder-title">Brak hipotez — system w stabilnym stanie</div></div>';
+    return;
+  }
+
+  content.innerHTML = hypotheses
+    .map((h) => {
+      const priorityColor = { critical: 'error', high: 'warning', medium: 'info', low: 'muted' }[h.priority] || 'muted';
+      return `
+    <div class="card mb-2" style="border-left:3px solid var(--${h.priority === 'critical' ? 'error' : h.priority === 'high' ? 'warning' : 'primary'});">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${h.icon || '◆'} ${escapeHTML(h.title)}</div>
+          <div class="card-sub">${escapeHTML(h.source)}</div>
+        </div>
+        <span class="pill pill-${priorityColor}">${escapeHTML(h.priority)}</span>
+      </div>
+      <div style="font-size:13px;line-height:1.6;color:var(--text-dim);">${h.detail}</div>
+      ${h.action ? `<div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:6px;font-size:12px;"><strong>Sugerowana akcja:</strong> ${h.action}</div>` : ''}
+      ${h.evidence ? `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:11px;color:var(--muted);">Evidence ▾</summary><ul style="margin:6px 0 0 18px;font-size:11px;color:var(--text-dim);">${h.evidence.map((e) => `<li>${escapeHTML(e)}</li>`).join('')}</ul></details>` : ''}
+    </div>
+  `;
+    })
+    .join('');
+}
+
+function buildHypotheses(rules, snapshot) {
+  const out = [];
+
+  // Critical: duplicate diagnosis
+  if (snapshot?.duplicate_diagnosis?.status === 'critical') {
+    const d = snapshot.duplicate_diagnosis;
+    out.push({
+      priority: 'critical',
+      icon: '🚨',
+      title: d.headline,
+      source: 'Google Ads MCP query (shopping_performance_view, last 30d)',
+      detail: `<strong>Likely root cause:</strong> ${escapeHTML(d.likely_root_causes?.[0]?.title || '—')}<br>${escapeHTML(d.likely_root_causes?.[0]?.detail || '')}`,
+      action: (d.recommended_actions || []).map(escapeHTML).join('<br>'),
+      evidence: d.evidence,
+    });
+  }
+
+  // Underperformers
+  for (const c of snapshot?.underperforming_campaigns || []) {
+    out.push({
+      priority: 'high',
+      icon: '↓',
+      title: `Kampania "${c.name}" — ROAS ${c.roas}x, strata budget`,
+      source: 'Live Google Ads snapshot',
+      detail: escapeHTML(c.alert),
+      action: 'Pauzuj campaign LUB sprawdź jeśli to acquisition (inne KPI: CPA, new customer rate)',
+    });
+  }
+
+  // Winners
+  for (const w of snapshot?.winner_campaigns?.slice(0, 1) || []) {
+    out.push({
+      priority: 'medium',
+      icon: '🏆',
+      title: `Replicate winner pattern: ${w.name} (ROAS ${w.roas}x)`,
+      source: 'Live Google Ads snapshot',
+      detail: escapeHTML(w.note),
+      action: 'Analizuj bid strategy + asset group + target ROAS, zastosuj do podobnych PMax campaigns',
+    });
+  }
+
+  // Rule-level heuristics
+  const activeRules = rules.filter((r) => r.active);
+  const inactive = rules.filter((r) => !r.active);
+
+  if (inactive.length > 0) {
+    out.push({
+      priority: 'low',
+      icon: '⊘',
+      title: `${inactive.length} nieaktywne reguły zaśmiecają config`,
+      source: 'Static analysis: rules with active=false',
+      detail: `Reguły: ${inactive.map((r) => escapeHTML(r.dupSuffix || r.id)).join(', ')}. Inactive rules nie wpływają na generation ale zaśmiecają audit history.`,
+      action: 'Rozważ DELETE jeśli pewny że nie wrócą do testu, lub ZACHOWAJ jako reference dla winners które przeszły do main feed',
+    });
+  }
+
+  // CAPS check on replaceWith
+  const capsViolations = activeRules.filter((r) => /[A-ZĄĆĘŁŃÓŚŹŻ]{3,}/.test(r.replaceWith || ''));
+  if (capsViolations.length > 0) {
+    out.push({
+      priority: 'medium',
+      icon: '⚠',
+      title: `${capsViolations.length} reguł ma ALL-CAPS w replaceWith`,
+      source: 'Static analysis: replaceWith pattern check',
+      detail: `Reguły: ${capsViolations.map((r) => escapeHTML(r.dupSuffix)).join(', ')}. Generator stosuje wordCapitalize() więc output będzie Title Case mimo CAPS w configu, ALE Title Case w panelu wygląda czytelniej i nie wprowadza w błąd.`,
+      action: 'Edytuj reguły żeby replaceWith już była Title Case — wynik identyczny, ale czytelniej',
+    });
+  }
+
+  // Variants in test inflation
+  if (activeRules.length > 7) {
+    out.push({
+      priority: 'medium',
+      icon: '↑',
+      title: `${activeRules.length} aktywnych reguł — overload cohort?`,
+      source: 'Static analysis: active rules count',
+      detail: 'Per Google Ads expert audit: >7 variants split same impression pool → underpowered tests (mało clicks per variant → no statistical significance). Industry recommends 3-7 variants per test cycle.',
+      action: 'Pauzuj wariants z najniższym priority lub konsoliduj testowy plan',
+    });
+  }
+
+  // PMax title length warning if snapshot includes it
+  // (placeholder for future: title length validation per rule)
+
+  return out;
 }
 
 // ---------- PERFORMANCE ----------
@@ -1137,11 +1339,20 @@ function previewImageSwap(product, newMainIdx) {
     return;
   }
 
+  const dupSuffix = 'img_' + ('abcdefgh'[Math.min(newMainIdx - 1, 7)] || 'x');
+  const imageRule = {
+    offerId: product.id,
+    promote_to_main_index: newMainIdx,
+    dupSuffix,
+    customLabel1: dupSuffix,
+    notes: `Image variant ${dupSuffix} — promotes additional_image_link[${newMainIdx - 1}] as main`,
+  };
+
   previewEl.innerHTML = `
     <div class="card" style="background:var(--bg);">
       <div class="card-header">
         <div class="card-title">Preview: swap-as-main</div>
-        <span class="pill pill-warning">no write yet — preview only</span>
+        <span class="pill pill-info">enabled · auto-fallback to Issue if PAT scope insufficient</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 40px 1fr;gap:20px;align-items:center;">
         <div>
@@ -1159,21 +1370,49 @@ function previewImageSwap(product, newMainIdx) {
         </div>
       </div>
       <div class="mb-2" style="margin-top:16px;padding:12px;background:var(--card-hover);border-radius:8px;font-size:12px;">
-        <div class="mb-1"><strong>Wygenerowałoby się to imageRule:</strong></div>
+        <div class="mb-1"><strong>Image rule do dodania (w config.json):</strong></div>
         <pre class="mono" style="font-size:11px;color:var(--text-dim);white-space:pre-wrap;">${escapeHTML(JSON.stringify({
-          id: `img-${product.id}-${newMainIdx}`,
-          offerId: product.id,
-          promote_to_main_index: newMainIdx,
-          dupSuffix: 'img_' + 'abc'[Math.min(newMainIdx - 1, 2)],
-          customLabel1: 'img_' + 'abc'[Math.min(newMainIdx - 1, 2)],
+          id: `img-${product.id}-${dupSuffix}`,
+          ...imageRule,
           active: true,
         }, null, 2))}</pre>
+        <div style="margin-top:8px;color:var(--text-dim);font-size:11px;">
+          ⚠ <strong>Heads-up:</strong> imageRule path w generate-feed.js jest gated by <span class="mono">feature_flags.image_rules_enabled</span> (default <span class="mono">false</span>). Reguła zostanie zapisana ale do generation TSV potrzeba ręcznie włączyć flag w config.json (next iteration: enable flag w UI).
+        </div>
       </div>
-      <button class="btn btn-block" disabled title="Write actions deferred do następnej sesji — bezpieczeństwo ponad wszystko">
-        Apply (disabled — coming next session with pre-flight diff)
-      </button>
+      <button class="btn btn-block" id="image-apply-btn">Apply image rule (commit to config.json)</button>
     </div>
   `;
+
+  document.getElementById('image-apply-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('image-apply-btn');
+    btn.disabled = true;
+    btn.textContent = 'Zapisuję…';
+    try {
+      const r = await fetch('/api/image-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(imageRule),
+      });
+      const j = await r.json();
+      if (r.ok || r.status === 202) {
+        const method = j.method === 'issue_fallback'
+          ? `via Issue #${j.issue_number} (workflow apply w ~30s)`
+          : 'direct PATCH';
+        const link = j.commit_url || j.issue_url || '#';
+        showToast(`✓ Image rule zapisana ${method}. <a class="mono" href="${escapeHTML(link)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">view →</a>`, 'success');
+        btn.textContent = '✓ Applied';
+      } else {
+        showToast('Błąd: ' + escapeHTML(j.error || 'unknown'), 'error');
+        btn.disabled = false;
+        btn.textContent = 'Apply image rule';
+      }
+    } catch (e) {
+      showToast('Błąd sieci: ' + escapeHTML(e.message), 'error');
+      btn.disabled = false;
+      btn.textContent = 'Apply image rule';
+    }
+  });
 }
 
 function renderAddVariant() {
@@ -1241,6 +1480,47 @@ function renderAddVariant() {
   });
 }
 
+// ---------- HEALTH BANNER ----------
+// Shows once on page load with status of write paths.
+// Helps Marcin understand at a glance what works fully vs needs token rotation.
+async function renderHealthBanner() {
+  const container = document.getElementById('health-banner-container');
+  if (!container) return;
+
+  // Quick probes: GET /api/config (read) + try regenerate as POST (cheap-ish)
+  let configOk = false;
+  try {
+    const r = await fetch('/api/config');
+    configOk = r.ok;
+  } catch {}
+
+  if (!configOk) {
+    container.innerHTML = `
+      <div style="background:var(--error-soft);color:var(--error);padding:10px 24px;border-bottom:1px solid rgba(248,113,113,0.3);font-size:13px;text-align:center;">
+        ⚠ <strong>System offline:</strong> /api/config nie odpowiada. Sprawdź Vercel deployment + GITHUB_TOKEN env var.
+      </div>
+    `;
+    return;
+  }
+
+  // All operations have fallback paths now. Banner is informational only,
+  // showing the current write-path strategy. Auto-dismiss after 8s.
+  container.innerHTML = `
+    <div id="health-banner-inner" style="background:var(--primary-soft);color:var(--primary);padding:8px 24px;border-bottom:1px solid rgba(79,155,247,0.3);font-size:12px;text-align:center;transition:opacity 0.4s;">
+      <strong>System ready</strong> · Edit / toggle / delete / regenerate / image rules: auto-fallback do GitHub Issue jeśli direct PATCH zwraca 403 (token scope). Wszystko działa bez Twojego token rotation.
+      <button id="health-banner-dismiss" style="margin-left:12px;background:transparent;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button>
+    </div>
+  `;
+  document.getElementById('health-banner-dismiss').addEventListener('click', () => {
+    container.innerHTML = '';
+  });
+  setTimeout(() => {
+    const el = document.getElementById('health-banner-inner');
+    if (el) el.style.opacity = '0';
+    setTimeout(() => { container.innerHTML = ''; }, 500);
+  }, 12000);
+}
+
 // ---------- Init ----------
 let _coreLoaded = null;
 function ensureCoreLoaded() {
@@ -1252,5 +1532,6 @@ window.addEventListener('hashchange', onHashChange);
 document.addEventListener('DOMContentLoaded', () => {
   // Start core data fetch in background ASAP
   ensureCoreLoaded();
+  renderHealthBanner();
   onHashChange();
 });

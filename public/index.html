@@ -22,6 +22,7 @@
     </div>
   </nav>
 
+  <div id="health-banner-container"></div>
   <main>
     <!-- TODAY -->
     <section id="section-today" class="section">
@@ -75,16 +76,10 @@
     <section id="section-hypotheses" class="section">
       <div class="section-header">
         <h1 class="section-title">Hypotheses</h1>
-        <div class="section-sub">Auto-generated title test ideas from GSC + Google Ads + GA4.</div>
+        <div class="section-sub" id="hyp-subtitle">Title test ideas — heuristic-derived z snapshot + current rules.</div>
       </div>
-      <div class="placeholder">
-        <div class="placeholder-icon">◷</div>
-        <div class="placeholder-title">Sprint 2 — Coming next</div>
-        <div class="placeholder-text">
-          4-step pipeline: GSC anonymous queries → Google Ads search terms (n-gram) → GA4 ecommerce per LP → seasonal volume.
-          Scoring: <span class="mono">(volume × CVR × CTR_gap)</span>.
-          Kanban flow: Suggested / Testing / Promoted / Rejected.
-        </div>
+      <div id="hyp-content">
+        <div class="loading">Generuję rekomendacje…</div>
       </div>
     </section>
 
@@ -181,14 +176,15 @@
     <section id="section-history" class="section">
       <div class="section-header">
         <h1 class="section-title">History</h1>
-        <div class="section-sub">Every config.json commit on room99-feed-duplicator.</div>
+        <div class="section-sub">Live commit timeline of <span class="mono">config.json</span> w room99-feed-duplicator.</div>
       </div>
-      <div class="placeholder">
-        <div class="placeholder-icon">⏱</div>
-        <div class="placeholder-title">Sprint 4 — Coming with diff view + rollback</div>
-        <div class="placeholder-text">
-          Timeline of changes with semantic diff (rule added/edited/deactivated). One-click revert via <span class="mono">git revert</span> API.
-          For now: <a id="history-temp-link" target="_blank" rel="noopener" class="mono">view commits on GitHub →</a>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="history-count">Loading commits…</div>
+          <a class="pill pill-info mono" id="history-github-link" target="_blank" rel="noopener">view on GitHub →</a>
+        </div>
+        <div id="history-content">
+          <div class="loading">Ładuję historię commitów…</div>
         </div>
       </div>
     </section>

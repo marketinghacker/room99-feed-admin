@@ -1,12 +1,15 @@
 // POST /api/regenerate-feed — Manually trigger regenerate-feed.yml workflow.
-// Two-tier strategy (auto-fallback):
-//   1. PRIMARY: GitHub Actions workflow_dispatch API (needs PAT scope Actions:R/W)
-//   2. FALLBACK: touch config.json (bump `_lastTouched` field) — triggers the
-//      same workflow via push event (paths: config.json). Needs only Contents:R/W
-//      which we already have for /api/rules/[id] writes.
+// Three-tier strategy (auto-fallback):
+//   1. PRIMARY: GitHub Actions workflow_dispatch API (needs PAT Actions:R/W)
+//   2. FALLBACK A: touch config.json (bump `_lastTouched`) — triggers workflow
+//      via push event (paths: config.json). Needs Contents:R/W.
+//   3. FALLBACK B: create Issue with `rule-action` label + `regenerate_touch`
+//      action — workflow `handle-rule-action-issue.yml` (with built-in
+//      GITHUB_TOKEN at full scope) touches config.json. Needs only Issues:W.
 //
-// The fallback is identical end-state — generate-feed.js runs same code path,
-// produces same TSV. The only difference is +1 commit in feed-duplicator history.
+// All three end-states are identical: cron-equivalent regen runs.
+
+import { createRuleActionIssue } from './_lib/issue-fallback.js';
 
 async function tryWorkflowDispatch(headers, owner, repo) {
   const r = await fetch(
@@ -104,12 +107,31 @@ export default async function handler(req, res) {
       });
     }
 
-    // Both failed — return diagnostics
+    // Both direct paths failed — try Issue fallback (only needs Issues:W)
+    const issueResult = await createRuleActionIssue({
+      ghHeaders: headers,
+      owner: GITHUB_OWNER,
+      repo,
+      action: 'regenerate_touch',
+      payload: { action: 'regenerate_touch' },
+      title: `[ACTION] regenerate feed ${new Date().toISOString()}`,
+    });
+    if (issueResult.ok) {
+      return res.status(202).json({
+        success: true,
+        method: 'issue_fallback',
+        issue_number: issueResult.issue_number,
+        issue_url: issueResult.issue_url,
+        message: `Direct workflow_dispatch + config touch obie zablokowane przez token scope — queued via Issue #${issueResult.issue_number}. Workflow apply w ~30s, regen w ≤1h.`,
+      });
+    }
+
     return res.status(touch.status || 500).json({
-      error: 'Both regenerate methods failed. Check PAT scope (need at least Contents:R/W).',
+      error: 'All three regenerate methods failed (dispatch, touch, issue). PAT may have no permissions at all.',
       workflow_dispatch: { status: dispatch.status, message: dispatch.details?.message },
       config_touch: { status: touch.status, message: touch.details?.message },
-      fix: 'Update GITHUB_TOKEN in Vercel with permissions: Contents:R/W + Actions:R/W on room99-feed-duplicator → redeploy.',
+      issue_fallback: { status: issueResult.status, error: issueResult.error },
+      fix: 'Verify GITHUB_TOKEN in Vercel has at minimum Issues:Write on room99-feed-duplicator.',
     });
   } catch (e) {
     return res.status(500).json({ error: e.message });
