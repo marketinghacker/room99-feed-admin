@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Room99 Feed Command Center</title>
-  <meta name="description" content="Single source of truth for Room99 Google Shopping feed optimization — titles, images, A/B tests, performance." />
+  <title>Room99 — Twoja pracownia</title>
+  <meta name="description" content="Spokojne miejsce do zarządzania reklamami Room99: testy tytułów, zdjęcia produktów, wyniki kampanii Google Shopping." />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <nav class="top-nav">
-    <div class="brand">Room99 <span class="brand-accent">Command Center</span></div>
+    <div class="brand">Room99 <span class="brand-accent">pracownia</span></div>
     <div class="tabs" id="tabs">
-      <a href="#today" data-tab="today">Today</a>
-      <a href="#rules" data-tab="rules">Rules</a>
-      <a href="#hypotheses" data-tab="hypotheses">Hypotheses</a>
-      <a href="#images" data-tab="images">Images</a>
-      <a href="#performance" data-tab="performance">Performance</a>
-      <a href="#feed-health" data-tab="feed-health">Feed Health</a>
-      <a href="#history" data-tab="history">History</a>
-      <a href="#add-variant" data-tab="add-variant" class="primary">+ Add Variant</a>
+      <a href="#today" data-tab="today">Dzień dobry</a>
+      <a href="#rules" data-tab="rules">Testy tytułów</a>
+      <a href="#hypotheses" data-tab="hypotheses">Co warto spróbować</a>
+      <a href="#images" data-tab="images">Zdjęcia</a>
+      <a href="#performance" data-tab="performance">Wyniki kampanii</a>
+      <a href="#feed-health" data-tab="feed-health">Sklep</a>
+      <a href="#history" data-tab="history">Kronika zmian</a>
+      <a href="#add-variant" data-tab="add-variant" class="primary">+ Nowy pomysł</a>
     </div>
   </nav>
 
@@ -27,29 +27,29 @@
     <!-- TODAY -->
     <section id="section-today" class="section">
       <div class="section-header">
-        <h1 class="section-title">Today</h1>
-        <div class="section-sub">Live snapshot of Room99 feed state. Read-only in Sprint 1.</div>
+        <h1 class="section-title">Dzień dobry, <em>Marcin</em></h1>
+        <div class="section-sub">Sklep Room99 jest na żywo. Tu zobaczysz najważniejsze liczby z ostatniej doby i to, co dzisiaj warto zrobić.</div>
       </div>
       <div class="kpi-strip" id="kpi-strip">
-        <div class="loading">Ładuję…</div>
+        <div class="loading">Sprawdzam, jak idzie…</div>
       </div>
       <div class="two-col">
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Decisions to make today</div>
-            <div class="card-sub">Sprint 2 will surface auto-generated hypotheses</div>
+            <div class="card-title">Co dziś warto zrobić</div>
+            <div class="card-sub">Sygnały z reklam i sklepu — sortowane po wadze</div>
           </div>
           <div id="decisions-feed">
-            <div class="loading">Ładuję sygnały…</div>
+            <div class="loading">Czytam sygnały z reklam…</div>
           </div>
         </div>
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Feed activity</div>
-            <div class="card-sub">Last cron tick + last config change</div>
+            <div class="card-title">Co się dzieje w tle</div>
+            <div class="card-sub">Ostatnia regeneracja sklepu i Twoja ostatnia zmiana</div>
           </div>
           <div id="feed-activity">
-            <div class="loading">Ładuję…</div>
+            <div class="loading">Sprawdzam…</div>
           </div>
         </div>
       </div>
@@ -58,16 +58,16 @@
     <!-- RULES -->
     <section id="section-rules" class="section">
       <div class="section-header">
-        <h1 class="section-title">Title test rules</h1>
-        <div class="section-sub">Active duplicate rules generating Shopping variants. Sprint 2 adds toggle/edit/delete.</div>
+        <h1 class="section-title">Twoje <em>testy tytułów</em></h1>
+        <div class="section-sub">Każdy test podmienia kawałek tytułu w wybranej grupie produktów i wpuszcza ich kopie do Google Shopping. Kliknij wiersz, żeby edytować — albo pauzować jednym kliknięciem.</div>
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title" id="rules-count">Loading rules…</div>
-          <a class="pill pill-info mono" id="rules-source-link" target="_blank" rel="noopener">view config.json on GitHub</a>
+          <div class="card-title" id="rules-count">Wczytuję testy…</div>
+          <a class="pill pill-info mono" id="rules-source-link" target="_blank" rel="noopener">otwórz w GitHubie</a>
         </div>
         <div id="rules-table-wrap">
-          <div class="loading">Ładuję reguły z config.json…</div>
+          <div class="loading">Wczytuję Twoje testy…</div>
         </div>
       </div>
     </section>
@@ -75,71 +75,70 @@
     <!-- HYPOTHESES -->
     <section id="section-hypotheses" class="section">
       <div class="section-header">
-        <h1 class="section-title">Hypotheses</h1>
-        <div class="section-sub" id="hyp-subtitle">Title test ideas — heuristic-derived z snapshot + current rules.</div>
+        <h1 class="section-title">Co warto <em>spróbować</em></h1>
+        <div class="section-sub" id="hyp-subtitle">Pomysły na podstawie tego, co dzieje się w Twoich reklamach. Czerwone = warto pochylić się dziś, żółte = w tym tygodniu, reszta = jak będzie czas.</div>
       </div>
       <div id="hyp-content">
-        <div class="loading">Generuję rekomendacje…</div>
+        <div class="loading">Zastanawiam się…</div>
       </div>
     </section>
 
     <!-- IMAGES -->
     <section id="section-images" class="section">
       <div class="section-header">
-        <h1 class="section-title">Image Manager</h1>
-        <div class="section-sub">Browse all 1841 products + their feed images. Click a product to view full gallery. Swap-as-main is preview-only in this iteration (no writes to feed yet).</div>
+        <h1 class="section-title">Zdjęcia <em>w sklepie</em></h1>
+        <div class="section-sub">Każdy produkt ma kilka zdjęć, ale Google Shopping pokazuje tylko jedno. Kliknij produkt, zobacz całą galerię, wybierz inne jako główne — sprawdź, czy nie pociągnie więcej kliknięć.</div>
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title" id="images-count">Loading products…</div>
+          <div class="card-title" id="images-count">Wczytuję produkty…</div>
           <div class="flex-gap-1">
-            <input type="search" id="images-search" placeholder="Szukaj produktu (tytuł lub id)" style="width:280px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);" />
-            <button class="btn" id="images-search-btn" style="padding:8px 14px;">Szukaj</button>
+            <input type="search" id="images-search" placeholder="Szukaj — wpisz nazwę albo numer" style="width:280px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);" />
+            <button class="btn" id="images-search-btn" style="padding:8px 16px;">Szukaj</button>
           </div>
         </div>
         <div id="images-grid">
-          <div class="loading">Ładuję listę produktów…</div>
+          <div class="loading">Wczytuję produkty…</div>
         </div>
-        <div id="images-pagination" class="flex-between" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);"></div>
+        <div id="images-pagination" class="flex-between" style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border);"></div>
       </div>
 
-      <!-- Per-product detail modal-like card (hidden by default) -->
-      <div class="card" id="images-detail" style="margin-top:20px;display:none;">
+      <div class="card" id="images-detail" style="margin-top:22px;display:none;">
         <div class="card-header">
           <div>
             <div class="card-title" id="detail-title">—</div>
             <div class="card-sub mono" id="detail-meta">—</div>
           </div>
-          <button class="btn" id="detail-close" style="padding:6px 12px;background:var(--card-hover);color:var(--text);">Zamknij</button>
+          <button class="btn" id="detail-close" style="padding:7px 14px;background:var(--card-hover);color:var(--text);">Zamknij</button>
         </div>
         <div id="detail-gallery"></div>
-        <div id="detail-preview" style="margin-top:16px;"></div>
+        <div id="detail-preview" style="margin-top:18px;"></div>
       </div>
     </section>
 
     <!-- PERFORMANCE -->
     <section id="section-performance" class="section">
       <div class="section-header">
-        <h1 class="section-title">Performance</h1>
-        <div class="section-sub" id="perf-subtitle">Loading Google Ads snapshot…</div>
+        <h1 class="section-title">Wyniki <em>kampanii</em></h1>
+        <div class="section-sub" id="perf-subtitle">Wczytuję najnowsze liczby z Twojego konta Google Ads…</div>
       </div>
       <div id="perf-diagnosis-banner"></div>
       <div class="kpi-strip" id="perf-summary"></div>
       <div class="card mb-2">
         <div class="card-header">
           <div>
-            <div class="card-title" id="perf-campaigns-title">Top campaigns (30d)</div>
+            <div class="card-title" id="perf-campaigns-title">Twoje kampanie (ostatni miesiąc)</div>
             <div class="card-sub" id="perf-campaigns-sub">—</div>
           </div>
         </div>
         <div id="perf-campaigns-table">
-          <div class="loading">Ładuję…</div>
+          <div class="loading">Wczytuję…</div>
         </div>
       </div>
       <div class="card" id="perf-actions-card" style="display:none;">
         <div class="card-header">
-          <div class="card-title">Rekomendowane akcje</div>
-          <div class="card-sub">Z duplicate diagnosis</div>
+          <div class="card-title">Co z tym zrobić</div>
+          <div class="card-sub">Konkretne kroki z diagnozy powyżej</div>
         </div>
         <div id="perf-actions"></div>
       </div>
@@ -148,26 +147,26 @@
     <!-- FEED HEALTH -->
     <section id="section-feed-health" class="section">
       <div class="section-header">
-        <h1 class="section-title">Feed Health</h1>
-        <div class="section-sub">Cron status, last regeneration, output size.</div>
+        <h1 class="section-title">Twój <em>sklep w Google</em></h1>
+        <div class="section-sub">Sklep aktualizuje się sam co godzinę. Jeśli chcesz przyspieszyć — kliknij „Odśwież teraz". Poniżej zobaczysz, kiedy ostatnio się aktualizował i co się zmieniło.</div>
       </div>
       <div class="card mb-2">
         <div class="card-header">
           <div>
-            <div class="card-title">Manual regeneration</div>
-            <div class="card-sub">Triggers regenerate-feed.yml workflow on demand (cron continues every hour regardless).</div>
+            <div class="card-title">Ręczne odświeżenie</div>
+            <div class="card-sub">Wymusza aktualizację sklepu poza zwykłym harmonogramem (co godzinę)</div>
           </div>
-          <button class="btn" id="regenerate-btn" style="padding:10px 16px;">⟳ Regenerate now</button>
+          <button class="btn" id="regenerate-btn" style="padding:11px 18px;">⟳ Odśwież teraz</button>
         </div>
         <div id="regenerate-status" class="alert"></div>
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title">System status</div>
+          <div class="card-title">Aktualny stan</div>
           <div class="card-sub" id="feed-health-fetched-at"></div>
         </div>
         <div id="feed-health-body">
-          <div class="loading">Ładuję…</div>
+          <div class="loading">Sprawdzam…</div>
         </div>
       </div>
     </section>
@@ -175,21 +174,21 @@
     <!-- HISTORY -->
     <section id="section-history" class="section">
       <div class="section-header">
-        <h1 class="section-title">History</h1>
-        <div class="section-sub">Live commit timeline of <span class="mono">config.json</span> w room99-feed-duplicator.</div>
+        <h1 class="section-title">Kronika <em>zmian</em></h1>
+        <div class="section-sub">Lista wszystkiego, co działo się z Twoimi testami — kto, kiedy, co. Klikalna do szczegółów w GitHubie.</div>
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title" id="history-count">Loading commits…</div>
-          <a class="pill pill-info mono" id="history-github-link" target="_blank" rel="noopener">view on GitHub →</a>
+          <div class="card-title" id="history-count">Wczytuję historię…</div>
+          <a class="pill pill-info mono" id="history-github-link" target="_blank" rel="noopener">otwórz w GitHubie</a>
         </div>
         <div id="history-content">
-          <div class="loading">Ładuję historię commitów…</div>
+          <div class="loading">Wczytuję historię zmian…</div>
         </div>
       </div>
     </section>
 
-    <!-- SIDE-PANEL EDITOR (Rules) -->
+    <!-- SIDE-PANEL EDYCJI -->
     <div class="side-panel-backdrop" id="side-panel-backdrop"></div>
     <aside class="side-panel" id="side-panel" aria-hidden="true">
       <div class="side-panel-header">
@@ -197,111 +196,112 @@
           <div class="card-title" id="sp-rule-id">—</div>
           <div class="card-sub" id="sp-rule-status">—</div>
         </div>
-        <button class="btn btn-secondary" id="sp-close" style="padding:6px 12px;">Zamknij</button>
+        <button class="btn btn-secondary" id="sp-close" style="padding:7px 14px;">Zamknij</button>
       </div>
       <div class="side-panel-body">
-        <div id="sp-impact-banner" style="margin-bottom:16px;"></div>
+        <div id="sp-impact-banner" style="margin-bottom:18px;"></div>
 
         <div class="field">
-          <label for="sp-matchInTitle">Grupa produktów (matchInTitle)</label>
+          <label for="sp-matchInTitle">Których produktów to dotyczy</label>
           <input type="text" id="sp-matchInTitle" />
-          <div class="hint">Tekst który MUSI być w tytule produktu żeby reguła zadziałała (case-insensitive)</div>
+          <div class="hint">Słowo które musi pojawić się w tytule produktu (np. <strong>GARDEN LINE</strong>) — wielkość liter nie ma znaczenia.</div>
         </div>
 
         <div class="field">
-          <label for="sp-searchInTitle">Szukaj w tytule (searchInTitle)</label>
+          <label for="sp-searchInTitle">Co podmienić w tytule</label>
           <input type="text" id="sp-searchInTitle" />
-          <div class="hint"><strong>UWAGA:</strong> zmiana tego pola zmieni które tytuły są transformowane — może zerwać statystyki A/B testu</div>
+          <div class="hint">Tekst który chcesz zastąpić. <strong>Uważaj:</strong> zmiana tego pola zaczyna nowy test od zera — stare statystyki w Google Ads stracą sens.</div>
         </div>
 
         <div class="field">
-          <label for="sp-replaceWith">Zastąp przez (replaceWith)</label>
+          <label for="sp-replaceWith">Czym to podmienić</label>
           <input type="text" id="sp-replaceWith" />
-          <div class="hint">Wynikowy tytuł będzie zawsze <strong>Title Case</strong> (każde słowo z dużej). Live preview poniżej.</div>
-          <div id="sp-replace-preview" class="text-dim mono" style="margin-top:6px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;min-height:28px;">—</div>
+          <div class="hint">Pisz jak chcesz — wynikowy tytuł i tak będzie miał każde słowo z dużej litery (bez krzyczących CAPS-ów).</div>
+          <div id="sp-replace-preview" class="text-dim mono" style="margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12.5px;min-height:30px;">—</div>
         </div>
 
         <div class="field">
-          <label for="sp-dupSuffix">Sufiks ID (dupSuffix)</label>
+          <label for="sp-dupSuffix">Krótki kod testu</label>
           <input type="text" id="sp-dupSuffix" pattern="[a-z0-9]+" maxlength="10" />
-          <div class="hint"><strong>UWAGA:</strong> zmiana sufiksu zmienia custom_label_1 → utrata historical attribution w Google Ads / GA4. Twórz NEW rule (np. t1_v2) zamiast in-place edit jeśli to A/B test.</div>
+          <div class="hint">Małe litery i cyfry (np. <strong>t8</strong>). To po nim rozpoznasz wariant w raportach Google Ads. <strong>Uważaj:</strong> zmiana zerwie historię — jeśli to nowy pomysł, lepiej zrób nowy test, zostaw stary.</div>
         </div>
 
         <div class="field">
-          <label for="sp-notes">Notatka</label>
-          <textarea id="sp-notes" rows="2"></textarea>
+          <label for="sp-notes">Notatka dla siebie</label>
+          <textarea id="sp-notes" rows="2" placeholder="Po co testujesz ten wariant? Co chcesz sprawdzić?"></textarea>
         </div>
 
-        <div class="card-header" style="margin-top:24px;margin-bottom:8px;">
-          <div class="card-title" style="font-size:14px;">Validators</div>
+        <div class="card-header" style="margin-top:26px;margin-bottom:10px;">
+          <div class="card-title" style="font-size:15px;">Co warto sprawdzić</div>
         </div>
         <div class="validator-list" id="sp-validators">
-          <div class="text-muted" style="font-size:12px;">Edytuj pole żeby zobaczyć walidatory…</div>
+          <div class="text-muted" style="font-size:13px;font-style:italic;">Zacznij edytować, a pokażę ostrzeżenia jeśli coś będzie wymagać uwagi…</div>
         </div>
 
-        <div class="card-header" style="margin-top:20px;margin-bottom:8px;">
-          <div class="card-title" style="font-size:14px;">Live preview (3 sample products)</div>
+        <div class="card-header" style="margin-top:22px;margin-bottom:10px;">
+          <div class="card-title" style="font-size:15px;">Jak to wyjdzie — podgląd</div>
           <span class="text-muted mono" style="font-size:11px;" id="sp-sample-count">—</span>
         </div>
         <div id="sp-samples">
-          <div class="text-muted" style="font-size:12px;">Wpisz pola powyżej aby zobaczyć podgląd…</div>
+          <div class="text-muted" style="font-size:13px;font-style:italic;">Wpisz pola powyżej, a pokażę 3 przykładowe produkty z nowym tytułem…</div>
         </div>
 
-        <details style="margin-top:20px;">
-          <summary class="card-title" style="font-size:13px;cursor:pointer;color:var(--text-dim);">Diff JSON (collapsed)</summary>
-          <pre class="mono" id="sp-diff" style="font-size:11px;background:var(--bg);padding:12px;border-radius:6px;margin-top:8px;overflow-x:auto;max-height:240px;color:var(--text-dim);">—</pre>
+        <details style="margin-top:22px;">
+          <summary class="card-title" style="font-size:13px;cursor:pointer;color:var(--text-dim);font-weight:400;">▸ Szczegóły techniczne (zwinięte)</summary>
+          <pre class="mono" id="sp-diff" style="font-size:11.5px;background:var(--bg);padding:14px;border-radius:8px;margin-top:10px;overflow-x:auto;max-height:240px;color:var(--text-dim);">—</pre>
         </details>
       </div>
       <div class="side-panel-footer">
-        <button class="btn btn-danger" id="sp-delete">Usuń</button>
-        <button class="btn btn-secondary" id="sp-toggle">Pause/Resume</button>
-        <button class="btn" id="sp-save">Zapisz</button>
+        <button class="btn btn-danger" id="sp-delete">Skasuj test</button>
+        <button class="btn btn-secondary" id="sp-toggle">Pauza / Wznów</button>
+        <button class="btn" id="sp-save">Zapisz zmiany</button>
       </div>
     </aside>
 
-    <!-- ADD VARIANT (legacy form, still works) -->
+    <!-- NOWY POMYSŁ (legacy form, działa równolegle z side-panel edycją) -->
     <section id="section-add-variant" class="section">
       <div class="section-header">
-        <h1 class="section-title">Add new title variant</h1>
-        <div class="section-sub">Legacy flow — creates a GitHub Issue → workflow merges to config.json → cron regenerates feed within 1h.</div>
+        <h1 class="section-title">Nowy <em>pomysł</em></h1>
+        <div class="section-sub">Wpadł Ci do głowy nowy tytuł do przetestowania? Wpisz go tutaj — wjedzie do sklepu w ciągu godziny. Możesz dodać też z telefonu.</div>
       </div>
       <div class="card form-card">
         <div id="alert" class="alert"></div>
         <form id="variant-form">
           <div class="field">
-            <label for="matchInTitle">Grupa produktów (Match w tytule)</label>
-            <input type="text" id="matchInTitle" name="matchInTitle" placeholder="GARDEN LINE" required />
-            <div class="hint">Skrypt znajdzie wszystkie produkty których tytuł zawiera ten string (case-insensitive)</div>
+            <label for="matchInTitle">Których produktów to dotyczy</label>
+            <input type="text" id="matchInTitle" name="matchInTitle" placeholder="np. GARDEN LINE" required />
+            <div class="hint">Słowo które musi pojawić się w tytule produktu. Wielkość liter nie ma znaczenia.</div>
           </div>
           <div class="field">
-            <label for="searchInTitle">Szukaj w tytule</label>
-            <input type="text" id="searchInTitle" name="searchInTitle" placeholder="ZASŁONA NA TARAS" required />
-            <div class="hint">Tekst który zostanie zastąpiony w tytule duplikatu</div>
+            <label for="searchInTitle">Co podmienić w tytule</label>
+            <input type="text" id="searchInTitle" name="searchInTitle" placeholder="np. ZASŁONA NA TARAS" required />
+            <div class="hint">Tekst który chcesz zastąpić.</div>
           </div>
           <div class="field">
-            <label for="replaceWith">Zastąp przez</label>
-            <input type="text" id="replaceWith" name="replaceWith" placeholder="Zasłona do altany" required />
-            <div class="hint">Pisz jak chcesz — wynikowy tytuł produktu i tak będzie <strong>Title Case</strong> (każde słowo z dużej, bez ALL-CAPS). Live preview poniżej:</div>
-            <div id="replace-preview" class="text-dim mono" style="margin-top:6px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;min-height:28px;">—</div>
+            <label for="replaceWith">Czym to podmienić</label>
+            <input type="text" id="replaceWith" name="replaceWith" placeholder="np. Zasłona do altany" required />
+            <div class="hint">Pisz jak chcesz — wynikowy tytuł i tak będzie miał każde słowo z dużej litery. Podgląd poniżej:</div>
+            <div id="replace-preview" class="text-dim mono" style="margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12.5px;min-height:30px;">—</div>
           </div>
           <div class="field">
-            <label for="dupSuffix">Sufiks ID (krótki, unikalny)</label>
-            <input type="text" id="dupSuffix" name="dupSuffix" placeholder="t8" required pattern="[a-z0-9]+" maxlength="10" />
-            <div class="hint">Małe litery i cyfry, max 10 znaków. Pojawi się w id (np. 9491_t8) i custom_label_1</div>
+            <label for="dupSuffix">Krótki kod testu</label>
+            <input type="text" id="dupSuffix" name="dupSuffix" placeholder="np. t8" required pattern="[a-z0-9]+" maxlength="10" />
+            <div class="hint">Małe litery i cyfry (max 10 znaków). Po tym kodzie rozpoznasz wariant w raportach Google Ads.</div>
           </div>
           <div class="field">
-            <label for="notes">Notatka (opcjonalna)</label>
-            <textarea id="notes" name="notes" placeholder="Hipoteza dlaczego testujemy ten wariant…"></textarea>
+            <label for="notes">Notatka (możesz pominąć)</label>
+            <textarea id="notes" name="notes" placeholder="Po co testujesz? Co chcesz sprawdzić?"></textarea>
           </div>
-          <button type="submit" id="submit-btn" class="btn btn-block">Dodaj wariant</button>
+          <button type="submit" id="submit-btn" class="btn btn-block">Dodaj nowy test</button>
         </form>
       </div>
     </section>
   </main>
 
   <footer>
-    Room99 Feed Command Center · Sprint 1 (read-only) · State in
-    <a class="mono" href="https://github.com/marketinghacker/room99-feed-duplicator/blob/main/config.json" target="_blank" rel="noopener">config.json</a>
+    Pracownia Room99 — wszystko zapisane w
+    <a class="mono" href="https://github.com/marketinghacker/room99-feed-duplicator/blob/main/config.json" target="_blank" rel="noopener">jednym pliku konfiguracyjnym</a>,
+    historia w git. Bez magii.
   </footer>
 
   <script src="/app.js"></script>
