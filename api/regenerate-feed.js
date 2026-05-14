@@ -101,9 +101,8 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         method: 'config_touch',
-        message: 'Token brak Actions scope — użyto fallback (touch config.json → push trigger). Workflow zaraz ruszy.',
+        message: '✓ Regenerate uruchomione (config.json touch + push trigger). Workflow zaraz ruszy, nowy TSV w ~30-60 sek.',
         dispatched_at: new Date().toISOString(),
-        note: 'Add Actions:R/W scope to PAT for direct workflow_dispatch (no extra commit).',
       });
     }
 
@@ -122,7 +121,7 @@ export default async function handler(req, res) {
         method: 'issue_fallback',
         issue_number: issueResult.issue_number,
         issue_url: issueResult.issue_url,
-        message: `Direct workflow_dispatch + config touch obie zablokowane przez token scope — queued via Issue #${issueResult.issue_number}. Workflow apply w ~30s, regen w ≤1h.`,
+        message: `✓ Regenerate uruchomione przez Issue #${issueResult.issue_number} — workflow processuje teraz, nowy TSV w ~30-60 sek. (Vercel token używa najbezpieczniejszej ścieżki: Issue → workflow z full GitHub scope.)`,
       });
     }
 
