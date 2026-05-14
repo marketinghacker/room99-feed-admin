@@ -1,10 +1,12 @@
 {
-  "snapshot_version": 2,
-  "captured_at": "2026-05-14T01:32:00Z",
-  "captured_by": "Claude Sonnet 4.7 1M via Google Ads MCP (manual snapshot — auto-refresh planned)",
+  "snapshot_version": 3,
+  "captured_at": "2026-05-14T02:30:00Z",
+  "captured_by": "Claude via 4-agent audit (UX + IA + live data scout + campaign mapping)",
   "account": {
     "google_ads_customer_id": "1331139339",
     "google_ads_mcc_id": "3386507395",
+    "ga4_property_id": "315856757",
+    "gsc_property": "https://room99.pl/",
     "currency": "PLN"
   },
 
@@ -19,60 +21,108 @@
     { "id": "23749320605", "name": "PMAX Narzuty MH",                       "channel": "PMAX",    "impressions": 188649,  "clicks": 3181,  "cost_pln": 4280.49,  "conv": 186.41,  "conv_value_pln": 31668.76,  "roas": 7.40,  "ctr": 0.0169, "cpc_pln": 1.35 },
     { "id": "22206689185", "name": "CSS2 Sembot Zasłony NetArch",           "channel": "PMAX",    "impressions": 198832,  "clicks": 3365,  "cost_pln": 3826.01,  "conv": 133.59,  "conv_value_pln": 29053.88,  "roas": 7.59,  "ctr": 0.0169, "cpc_pln": 1.14 },
     { "id": "22339508791", "name": "Search General TEST_BM",                "channel": "Search",  "impressions": 50357,   "clicks": 2383,  "cost_pln": 3687.77,  "conv": 133.18,  "conv_value_pln": 32202.31,  "roas": 8.73,  "ctr": 0.0473, "cpc_pln": 1.55 },
-    { "id": "21911616173", "name": "Search Tree _Zasłony",                  "channel": "Search",  "impressions": 39147,   "clicks": 2199,  "cost_pln": 3533.27,  "conv": 113.00,  "conv_value_pln": 21580.79,  "roas": 6.11,  "ctr": 0.0562, "cpc_pln": 1.61 },
-    { "id": "20411598932", "name": "PMAX Firany MH",                        "channel": "PMAX",    "impressions": 189500,  "clicks": 5351,  "cost_pln": 3132.43,  "conv": 108.72,  "conv_value_pln": 24579.58,  "roas": 7.85,  "ctr": 0.0282, "cpc_pln": 0.59 },
-    { "id": "22263446825", "name": "CSS2 Sembot Narzuty",                   "channel": "PMAX",    "impressions": 127619,  "clicks": 3613,  "cost_pln": 2825.23,  "conv": 172.55,  "conv_value_pln": 28428.50,  "roas": 10.06, "ctr": 0.0283, "cpc_pln": 0.78 },
-    { "id": "23755851571", "name": "[PLA] TOFU MH",                         "channel": "Shopping","impressions": 29808,   "clicks": 563,   "cost_pln": 2724.71,  "conv": 11.30,   "conv_value_pln": 2128.58,   "roas": 0.78,  "ctr": 0.0189, "cpc_pln": 4.84 },
-    { "id": "23486410797", "name": "CSS2 PM Off White",                     "channel": "PMAX",    "impressions": 63415,   "clicks": 1949,  "cost_pln": 2505.23,  "conv": 111.67,  "conv_value_pln": 25272.96,  "roas": 10.09, "ctr": 0.0307, "cpc_pln": 1.29 }
-  ],
-
-  "top_campaigns_7d": [
-    { "id": "20387140709", "name": "PMAX Zasłony MH",                       "channel": "PMAX",    "impressions": 382032, "clicks": 8098, "cost_pln": 12760.07, "conv": 446.01, "conv_value_pln": 103604.45, "roas": 8.12 },
-    { "id": "20654207259", "name": "CSS1 Room99 (b)",                       "channel": "Shopping","impressions": 72883,  "clicks": 1620, "cost_pln": 2529.93,  "conv": 70.72,  "conv_value_pln": 14823.37,  "roas": 5.86 },
-    { "id": "23749320605", "name": "PMAX Narzuty MH",                       "channel": "PMAX",    "impressions": 86539,  "clicks": 1471, "cost_pln": 2096.62,  "conv": 76.39,  "conv_value_pln": 13401.82,  "roas": 6.39 },
-    { "id": "20985264378", "name": "CSS3 PM Miesięczne Bestsellery + 9692", "channel": "PMAX",    "impressions": 78857,  "clicks": 1621, "cost_pln": 1860.22,  "conv": 81.54,  "conv_value_pln": 18009.06,  "roas": 9.68 },
-    { "id": "23695013721", "name": "[PLA] Firany",                          "channel": "Shopping","impressions": 63073,  "clicks": 946,  "cost_pln": 1528.96,  "conv": 58.81,  "conv_value_pln": 13267.78,  "roas": 8.68 },
-    { "id": "23499542379", "name": "CSS2 Boost 01.2026",                    "channel": "PMAX",    "impressions": 59625,  "clicks": 1239, "cost_pln": 1460.61,  "conv": 63.07,  "conv_value_pln": 12158.80,  "roas": 8.32 },
-    { "id": "21069335673", "name": "CSS3 PM Perfo Labalizer",               "channel": "PMAX",    "impressions": 42105,  "clicks": 919,  "cost_pln": 878.04,   "conv": 56.31,  "conv_value_pln": 13462.19,  "roas": 15.33 },
-    { "id": "22263446825", "name": "CSS2 Sembot Narzuty",                   "channel": "PMAX",    "impressions": 28311,  "clicks": 859,  "cost_pln": 815.33,   "conv": 31.77,  "conv_value_pln": 5420.95,   "roas": 6.65 },
-    { "id": "22206689185", "name": "CSS2 Sembot Zasłony NetArch",           "channel": "PMAX",    "impressions": 44274,  "clicks": 754,  "cost_pln": 799.95,   "conv": 24.57,  "conv_value_pln": 5276.55,   "roas": 6.60 },
-    { "id": "21911616173", "name": "Search Tree _Zasłony",                  "channel": "Search",  "impressions": 8866,   "clicks": 483,  "cost_pln": 779.07,   "conv": 14.62,  "conv_value_pln": 3443.80,   "roas": 4.42 }
+    { "id": "23755851571", "name": "[PLA] TOFU MH",                         "channel": "Shopping","impressions": 29808,   "clicks": 563,   "cost_pln": 2724.71,  "conv": 11.30,   "conv_value_pln": 2128.58,   "roas": 0.78,  "ctr": 0.0189, "cpc_pln": 4.84 }
   ],
 
   "duplicate_diagnosis": {
     "status": "critical",
-    "headline": "Duplikaty t1..t7 mają 0 impressions (ostatnie 7d) — A/B test wciąż invisible",
+    "headline": "Twój test tytułów nie zbiera danych od 2 miesięcy — wiem już dokładnie dlaczego",
+    "root_cause_confirmed": true,
     "evidence": [
-      "Query: shopping_performance_view WHERE custom_attribute1 IN (t1..t7) AND date LAST_7_DAYS → 0 wierszy",
-      "Query: shopping_performance_view WHERE product_item_id LIKE '%_t%' AND impressions > 0 AND date LAST_7_DAYS → 0 wierszy",
-      "Source feed FO ma 1841 produktów, generator tworzy 548 duplikatów w output TSV — TSV się generuje, ale duplikaty wciąż nie wchodzą do aukcji"
+      "Masz dedykowaną kampanię testową: [PLA] Zasłony Garden Line Testy Tytułów (ID 23840838231) z 5 ad-groupami: 'Zasłony do Altany', 'Zasłony nieprzemakalne', 'Zasłony wodoszczelne', 'Zasłony balkonowe', 'Zasłony do Pergoli'.",
+      "Każda z tych ad-group ma filtr inventory scoping na: custom_label_8 = 't1' / 't2' / 't3' / 't4' / 't5' (potwierdzone w ad_group_criterion).",
+      "Twoja config.json wpisuje duplikatom: custom_label_0 = 'TITLE_TEST'. To kompletny mismatch — klucz 0 vs klucz 8.",
+      "Skutek: duplikaty wypadają z każdej regular kampanii (PMAX Zasłony MH, CSS3, etc. — scoping na custom_label_0 = category) ORAZ nie wpadają do dedykowanej kampanii testowej (oczekuje custom_label_8 = tN). 0 impressions od 2 miesięcy."
     ],
-    "likely_root_causes": [
-      {
-        "code": "INVENTORY_FILTER_CONFLICT",
-        "probability": "high",
-        "title": "Custom_label_0='TITLE_TEST' nie pasuje do inventory filters istniejących kampanii (PROVEN)",
-        "detail": "Marcin używa custom_label_0 jako product category (np. 'Zasłony na taras', 'Zasłony gotowe > Zasłony zaciemniające'). PMAX/PLA campaigns mają inventory filter scopujący po custom_label_0 do tych kategorii. Duplikaty z override custom_label_0='TITLE_TEST' wypadają poza scope → 0 impressions. POTWIERDZONE przez parent product 9491 którego custom_label_0='Zasłony na taras' generuje 2476 impressions/90d."
-      },
-      {
-        "code": "GMC_DISAPPROVAL_DUPES",
-        "probability": "medium",
-        "title": "GMC może odrzucić duplikaty jako 'duplicate product'",
-        "detail": "Mimo identifier_exists=no + clear GTIN/MPN, niektóre konta GMC oznaczają duplikaty z tym samym landing page jako 'duplicate-product' policy violation. Wymaga sprawdzenia w GMC Diagnostics UI."
-      },
-      {
-        "code": "SUPPLEMENTARY_FEED_NOT_LINKED",
-        "probability": "medium",
-        "title": "Output TSV z GitHub Pages nie jest podłączony do GMC jako primary feed",
-        "detail": "Jeśli output/google-pl-with-test-titles.tsv nie jest scheduled fetch w GMC, duplikaty nigdy nie trafiają do Merchant Center. Sprawdź GMC → Products → Feeds → status feed-test-titles."
-      }
-    ],
-    "recommended_actions": [
-      "1) ZAUTORYZUJ FIX gotowy do commit: zmiana w duplicateFieldOverrides — usuń custom_label_0='TITLE_TEST' (zachowaj parent category np. 'Zasłony na taras'), dodaj custom_label_2='TITLE_TEST' jako marker (current value: empty). Pre-flight diff PASSED (548 rows, custom_label_0 zmienia per parent, custom_label_2 wypełnione, reszta byte-identical).",
-      "2) Po fix: w 24-48h przesprawdź shopping_performance_view WHERE custom_attribute2='TITLE_TEST' — powinny być widoczne impressions per t1..t7.",
-      "3) Bonus: Wejść w GMC Diagnostics (UI) i sprawdzić czy są jakiekolwiek active warnings na duplikatach (na wszelki wypadek if root cause #2)."
-    ]
+    "fix_proposal": {
+      "name": "Zamień custom_label_0 → custom_label_8 z value per regule",
+      "before": "config.duplicateFieldOverrides.custom_label_0 = 'TITLE_TEST' (wszystkie duplikaty mają identyczną wartość)",
+      "after": "Usuń custom_label_0 override. W generate-feed.js: dla każdej reguły wpisz duplikatowi custom_label_8 = rule.dupSuffix (t1..t5,t6,t7).",
+      "preserves": "Custom_label_0 zachowa parent value (np. 'zasłony gotowe > zasłony 140x300'). Custom_label_1 zachowa parent collection ('garden line'). Custom_label_8 dostanie kod testu — i tylko ten klucz Twoja kampania testowa filtruje.",
+      "expected_outcome_week1": "15 000–30 000 impressions, 200–500 clicks, koszt 200–500 PLN, ROAS w okolicy parent campaigns (7–11x) — pierwszy sensowny sygnał A/B testu od 2 mc.",
+      "caveat_t6_t7": "Brakuje destination ad-groupów dla t6 (BLACKOUT) i t7 (Garden Line wodoodporna). Marcin musi dodać 2 ad groupy w kampanii 23840838231 z filtrem custom_label_8='t6' i 't7' — albo na razie skip tych 2 testów."
+    }
   },
+
+  "proposed_new_tests": [
+    {
+      "rank": 1, "priority_score": 10,
+      "title_proposed": "Firana do Salonu Gotowa na Taśmie",
+      "match_group": "FIRANA TAŚMA",
+      "products_in_scope": 70,
+      "evidence": "Google Ads search term 'firana do salonu' ROAS 28.47x (najwyższy w całym dataset). GSC 'firany do salonu' 34 603 imp / CTR 1.0% / pos 11 + 'firany gotowe' 28 511 imp / CTR 1.1% / pos 8.7 — łącznie 63k imp/90d na p.2 SERP.",
+      "expected_revenue_pln_per_month": 1560,
+      "campaign_target": "PMAX Zasłony MH / CSS3 PM Miesięczne Bestsellery"
+    },
+    {
+      "rank": 2, "priority_score": 10,
+      "title_proposed": "Zasłona Nieprzemakalna na Taras 140x250",
+      "match_group": "ZASŁONA TARAS",
+      "products_in_scope": 72,
+      "evidence": "GA4 /k/zaslony-na-taras = #1 landing page z 24 362 sesji/30d. Obecne t1-t5 GARDEN LINE fragmentują uwagę na 5 wariantów; konsolidacja na jeden dominujący keyword z wymiarem (rozmiar = exact-match query intent).",
+      "expected_revenue_pln_per_month": 1950,
+      "campaign_target": "PMAX Zasłony MH"
+    },
+    {
+      "rank": 3, "priority_score": 10,
+      "title_proposed": "Zasłona Blackout do Sypialni 140x250",
+      "match_group": "BLACKOUT 140x250",
+      "products_in_scope": 60,
+      "evidence": "GSC 'zasłony beżowe' pos 4.1 CTR 1.3% + 'zasłony do sypialni' Ads ROAS 8.35x. Obecne t6 'Zasłona blackout' zbyt generyczne — dodanie 'do sypialni' + wymiaru przesuwa intent z eksploracji do zakupu.",
+      "expected_revenue_pln_per_month": 1370,
+      "campaign_target": "PMAX Zasłony MH"
+    },
+    {
+      "rank": 4, "priority_score": 9,
+      "title_proposed": "Zasłona na Żabkach do Salonu",
+      "match_group": "ŻABKI",
+      "products_in_scope": 80,
+      "evidence": "Ads 'zasłony na żabki' 167.8 PLN cost przy CTR 10.66% — wysoki intent, niska konwersja → title mismatch. GSC 'zasłony na przelotkach' pos 5.2, 6643 imp.",
+      "expected_revenue_pln_per_month": 980
+    },
+    {
+      "rank": 5, "priority_score": 9,
+      "title_proposed": "Narzuta na Łóżko 200x220 Beżowa Pikowana",
+      "match_group": "NARZUTA 200x220",
+      "products_in_scope": 50,
+      "evidence": "GA4 /k/narzuty-na-lozko-200x220 top 14 landing pages (2580 sesji/30d). GSC 'narzuta na łóżko 160x200' 6726 imp pos 6.5. Ads 'narzuty na łóżko' ROAS 8.26x.",
+      "expected_revenue_pln_per_month": 870
+    },
+    {
+      "rank": 6, "priority_score": 8,
+      "title_proposed": "Poszewka na Poduszkę 40x40 Ozdobna",
+      "match_group": "POSZEWKA 40x40",
+      "products_in_scope": 90,
+      "evidence": "GSC 'poszewki na poduszki 40x40' 11 431 imp pos 4.1 (size-specific) + 'poszewka 40x40' 7409 imp pos 4.4. Wymiar > typ produktu w intent.",
+      "expected_revenue_pln_per_month": 720
+    },
+    {
+      "rank": 7, "priority_score": 8,
+      "title_proposed": "Obrus na Stół Plamoodporny Biały",
+      "match_group": "OBRUS PLAMOODPORNY",
+      "products_in_scope": 40,
+      "evidence": "GSC 'obrus na stół' 14 528 imp pos 4.8 CTR 1.3% — blisko top-3. GA4 'obrusy biale' 1350 sesji. Ads 'obrusy wielkanocne' 220 PLN cost ROAS 1.33 — unika sezonowego dryfu.",
+      "expected_revenue_pln_per_month": 580
+    },
+    {
+      "rank": 8, "priority_score": 7,
+      "title_proposed": "Poduszka na Krzesło Kuchenne Wiązana",
+      "match_group": "PODUSZKA KRZESŁO",
+      "products_in_scope": 40,
+      "evidence": "GSC 'poduszki na krzesła' 15 940 imp pos 6.1 + 'poduszka na krzesło' 9456 imp pos 6.2 — razem 25k imp/90d przy CTR ~1%.",
+      "expected_revenue_pln_per_month": 460
+    }
+  ],
+
+  "rules_campaign_mapping": [
+    { "rule_id": "garden-t1-altany",       "dupSuffix": "t1", "target_campaign_id": "23840838231", "target_campaign_name": "[PLA] Zasłony Garden Line Testy Tytułów", "target_ad_group": "Zasłony do Altany",       "current_filter": "custom_label_8='t1'", "match_status": "ready_after_fix" },
+    { "rule_id": "garden-t2-nieprzemakalna","dupSuffix":"t2", "target_campaign_id": "23840838231", "target_campaign_name": "[PLA] Zasłony Garden Line Testy Tytułów", "target_ad_group": "Zasłony nieprzemakalne","current_filter": "custom_label_8='t2'", "match_status": "ready_after_fix" },
+    { "rule_id": "garden-t3-wodoszczelna", "dupSuffix": "t3", "target_campaign_id": "23840838231", "target_campaign_name": "[PLA] Zasłony Garden Line Testy Tytułów", "target_ad_group": "Zasłony wodoszczelne", "current_filter": "custom_label_8='t3'", "match_status": "ready_after_fix" },
+    { "rule_id": "garden-t4-balkonowa",    "dupSuffix": "t4", "target_campaign_id": "23840838231", "target_campaign_name": "[PLA] Zasłony Garden Line Testy Tytułów", "target_ad_group": "Zasłony balkonowe",     "current_filter": "custom_label_8='t4'", "match_status": "ready_after_fix" },
+    { "rule_id": "garden-t5-pergoli",      "dupSuffix": "t5", "target_campaign_id": "23840838231", "target_campaign_name": "[PLA] Zasłony Garden Line Testy Tytułów", "target_ad_group": "Zasłony do Pergoli",    "current_filter": "custom_label_8='t5'", "match_status": "ready_after_fix" },
+    { "rule_id": "issue-2-t6",             "dupSuffix": "t6", "target_campaign_id": null,           "target_campaign_name": null,                                       "target_ad_group": null,                       "current_filter": null,                  "match_status": "needs_ad_group_creation", "note": "Brakuje ad-group z filtrem custom_label_8='t6' w którejkolwiek kampanii. Marcin musi dorobić (lub na razie skip t6)." },
+    { "rule_id": "issue-3-t7",             "dupSuffix": "t7", "target_campaign_id": null,           "target_campaign_name": null,                                       "target_ad_group": null,                       "current_filter": null,                  "match_status": "needs_ad_group_creation", "note": "Brakuje ad-group z filtrem custom_label_8='t7'. Marcin musi dorobić (lub na razie skip t7)." }
+  ],
 
   "underperforming_campaigns": [
     {
@@ -80,13 +130,14 @@
       "name": "[PLA] TOFU MH",
       "roas": 0.78,
       "cost_pln": 2724.71,
-      "alert": "ROAS poniżej 1.0 (30d) — spend 2724.71 PLN, conv value tylko 2128.58 PLN. Strata 596 PLN/30d. Sprawdź jeśli to acquisition campaign z innymi KPI (CPA, new customer rate) lub rozważ pauzę."
+      "alert": "ROAS poniżej 1.0 (30d) — spend 2724.71 PLN, conv value tylko 2128.58 PLN. Strata 596 PLN/30d.",
+      "action_proposal": "Pauzuj — chyba że to świadoma kampania pozyskująca (sprawdź CPA i % nowych klientów osobno)"
     }
   ],
 
   "winner_campaigns": [
-    { "id": "21069335673", "name": "CSS3 PM Perfo Labalizer", "roas": 14.62, "roas_7d": 15.33, "note": "Najwyższy ROAS w 30d AND 7d window. Stabilny winner. Review bid strategy i replicate pattern do innych PMax campaigns." },
-    { "id": "20387140709", "name": "PMAX Zasłony MH",         "roas": 11.05, "roas_7d": 8.12,  "note": "Flagship — największa skala. ROAS spadł z 11.05 (30d) do 8.12 (7d) — możliwa krótkoterminowa weakness, monitor." }
+    { "id": "21069335673", "name": "CSS3 PM Perfo Labalizer", "roas": 14.62, "note": "Najwyższy ROAS — skopiuj bid strategy + asset group structure do innych PMax." },
+    { "id": "20387140709", "name": "PMAX Zasłony MH",         "roas": 11.05, "note": "Flagship — największa skala. Pierwszy beneficjent fix-a custom_label_8." }
   ],
 
   "summary_30d": {
@@ -97,16 +148,5 @@
     "total_clicks": 81047,
     "blended_cpc_pln": 1.30,
     "blended_ctr": 0.0216
-  },
-
-  "summary_7d": {
-    "total_cost_pln": 25509.0,
-    "total_conv_value_pln": 202869.0,
-    "blended_roas": 7.95,
-    "total_impressions": 866565,
-    "total_clicks": 17919,
-    "blended_cpc_pln": 1.42,
-    "blended_ctr": 0.0207,
-    "note_vs_30d": "Blended ROAS 7d (7.95x) niższy niż 30d (9.69x) — możliwa krótkoterminowa weakness, ale wciąż profitable above target. Monitor week-over-week trend."
   }
 }

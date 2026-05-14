@@ -306,9 +306,28 @@ async function renderRules() {
     return;
   }
 
+  // Mapping kampanii z snapshot (jeśli dostępne)
+  const mappingByDupSuffix = {};
+  for (const m of (state.perfSnapshot?.rules_campaign_mapping || [])) {
+    if (m.dupSuffix) mappingByDupSuffix[m.dupSuffix] = m;
+  }
+
   const rows = rules
     .map(
-      (r) => `
+      (r) => {
+        const m = mappingByDupSuffix[r.dupSuffix];
+        let campaignCell;
+        if (m && m.match_status === 'ready_after_fix') {
+          campaignCell = `<div style="font-size:13px;line-height:1.4;">${escapeHTML(m.target_campaign_name || '—')}</div>
+            <div class="text-muted" style="font-size:11px;font-style:italic;">grupa: ${escapeHTML(m.target_ad_group || '—')}</div>
+            <div class="pill pill-warning" style="margin-top:4px;font-size:10px;">czeka na fix custom_label_8</div>`;
+        } else if (m && m.match_status === 'needs_ad_group_creation') {
+          campaignCell = `<div class="pill pill-error" style="font-size:10px;">brak ad-group w żadnej kampanii</div>
+            <div class="text-muted" style="font-size:11px;font-style:italic;margin-top:4px;">${escapeHTML(m.note || '')}</div>`;
+        } else {
+          campaignCell = '<span class="text-muted" style="font-size:11px;font-style:italic;">—</span>';
+        }
+        return `
     <tr class="rules-row" data-rule-id="${escapeHTML(r.id)}">
       <td class="mono"><strong>${escapeHTML(r.dupSuffix || '—')}</strong></td>
       <td><span class="pill pill-muted">${escapeHTML(r.matchInTitle || '—')}</span></td>
@@ -317,19 +336,20 @@ async function renderRules() {
         <div style="font-weight:500;">${escapeHTML(r.replaceWith || '')}</div>
       </td>
       <td>
-        <span class="pill match-count-badge pill-info" data-mc-rule="${escapeHTML(r.id)}" title="Loading…">…</span>
+        <span class="pill match-count-badge pill-info" data-mc-rule="${escapeHTML(r.id)}" title="Wczytuję liczbę produktów…">…</span>
       </td>
+      <td>${campaignCell}</td>
       <td>
-        <button class="pill status-toggle ${r.active ? 'pill-success' : 'pill-muted'}" data-toggle-rule="${escapeHTML(r.id)}" data-current="${r.active ? 'true' : 'false'}" title="Klik aby ${r.active ? 'wyłączyć' : 'włączyć'}">
-          ${r.active ? 'active' : 'inactive'}
+        <button class="pill status-toggle ${r.active ? 'pill-success' : 'pill-muted'}" data-toggle-rule="${escapeHTML(r.id)}" data-current="${r.active ? 'true' : 'false'}" title="Klik aby ${r.active ? 'spauzować' : 'wznowić'}">
+          ${r.active ? 'biegnie' : 'pauza'}
         </button>
       </td>
-      <td class="text-muted" style="font-size:12px;">${escapeHTML(r.notes || '')}</td>
       <td>
-        <button class="pill pill-info edit-rule-btn" data-edit-rule="${escapeHTML(r.id)}" style="border:none;cursor:pointer;">Edit →</button>
+        <button class="pill pill-info edit-rule-btn" data-edit-rule="${escapeHTML(r.id)}" style="border:none;cursor:pointer;">Edytuj →</button>
       </td>
     </tr>
-  `
+  `;
+      }
     )
     .join('');
 
@@ -337,13 +357,13 @@ async function renderRules() {
     <table class="data-table">
       <thead>
         <tr>
-          <th>Suffix</th>
-          <th>Group</th>
-          <th>Search → Replace</th>
-          <th>Match #</th>
-          <th>Status</th>
-          <th>Notes</th>
-          <th>Actions</th>
+          <th>Kod</th>
+          <th>Grupa</th>
+          <th>Co → na co</th>
+          <th>Produktów</th>
+          <th>Kampania docelowa</th>
+          <th>Stan</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -844,7 +864,39 @@ async function renderFeedHealth() {
   `;
 }
 
-// ---------- HISTORY ----------
+// ---------- HISTORIA ----------
+// Tłumaczy techniczne git commits na ludzki język. Ukrywa SHA, bot-names,
+// "chore(rule-action): apply issue #N" technicalia.
+function humanizeCommitMessage(msg, author) {
+  if (!msg) return { title: 'Zmiana', who: author || 'system' };
+  const m = msg.replace(/\n.*$/s, '').trim();
+
+  // Wzorce automatyczne (workflow / bot)
+  if (/chore: auto-regenerate/.test(m)) return { title: 'Sklep odświeżył się automatycznie', who: 'system', kind: 'auto' };
+  if (/chore\(rule-action\)/.test(m)) {
+    const issueNum = m.match(/issue #(\d+)/)?.[1];
+    return { title: 'Twoja zmiana zastosowana w sklepie', who: 'system', kind: 'action', note: issueNum ? `zlecone z panelu #${issueNum}` : '' };
+  }
+  if (/chore\(image-rule\)/.test(m)) return { title: 'Nowa reguła obrazka dodana', who: 'system', kind: 'image' };
+  if (/chore: manual regenerate/.test(m)) return { title: 'Ręczne odświeżenie sklepu', who: 'Ty', kind: 'manual' };
+  if (/feat: add variant/.test(m)) {
+    const issueNum = m.match(/issue #(\d+)/)?.[1];
+    return { title: 'Nowy test tytułu dodany', who: 'Ty', kind: 'add', note: issueNum ? `przez formularz #${issueNum}` : '' };
+  }
+  if (/chore\(rules\):/.test(m)) {
+    if (/toggle/.test(m)) return { title: 'Pauza/wznowienie testu', who: 'Ty', kind: 'toggle' };
+    if (/edit/.test(m)) return { title: 'Edycja testu', who: 'Ty', kind: 'edit' };
+    if (/delete/.test(m)) return { title: 'Test usunięty', who: 'Ty', kind: 'delete' };
+    return { title: 'Zmiana w teście', who: 'Ty', kind: 'edit' };
+  }
+  if (/^fix/.test(m)) return { title: m.replace(/^fix[\(:][^)]*\)?\s*:?\s*/, '').replace(/^\w/, (c) => c.toUpperCase()), who: author || 'Ty', kind: 'fix' };
+  if (/^feat/.test(m)) return { title: m.replace(/^feat\s*:?\s*/, '').replace(/^\w/, (c) => c.toUpperCase()), who: author || 'Ty', kind: 'add' };
+
+  // Default: pokaż surowe ale bez SHA/issue formalizmu
+  const cleaned = m.replace(/\s*#\d+\s*/g, ' ').replace(/^chore\s*\([^)]+\)\s*:\s*/i, '').replace(/^\w/, (c) => c.toUpperCase());
+  return { title: cleaned, who: author || 'system', kind: 'other' };
+}
+
 async function renderHistory() {
   const link = document.getElementById('history-github-link');
   if (link) link.href = COMMITS_URL;
@@ -856,38 +908,48 @@ async function renderHistory() {
   try {
     data = await fetchJSON('/api/commits?path=config.json&per_page=30');
   } catch (e) {
-    countEl.textContent = 'Błąd ładowania';
+    countEl.textContent = 'Nie udało się wczytać';
     content.innerHTML = `<div class="alert error show">Nie udało się pobrać historii: ${escapeHTML(e.message)}</div>`;
     return;
   }
 
   const commits = data.commits || [];
-  countEl.textContent = `${commits.length} commitów na config.json (najnowsze najpierw)`;
+  countEl.textContent = commits.length === 0
+    ? 'Brak zmian'
+    : (commits.length === 1 ? '1 zmiana w Twojej konfiguracji' : `${commits.length} zmian w Twojej konfiguracji`);
 
   if (commits.length === 0) {
-    content.innerHTML = '<div class="placeholder"><div class="placeholder-title">Brak commitów</div></div>';
+    content.innerHTML = '<div class="placeholder"><div class="placeholder-title">Jeszcze nic się nie działo</div></div>';
     return;
   }
 
+  const iconFor = (kind) => ({
+    auto: { c: 'muted', i: '⟳' },
+    action: { c: 'info', i: '✎' },
+    image: { c: 'info', i: '▣' },
+    manual: { c: 'success', i: '⟳' },
+    add: { c: 'success', i: '+' },
+    toggle: { c: 'info', i: '⏸' },
+    edit: { c: 'info', i: '✎' },
+    delete: { c: 'error', i: '✕' },
+    fix: { c: 'warning', i: '⚠' },
+    other: { c: 'muted', i: '·' },
+  })[kind] || { c: 'muted', i: '·' };
+
   content.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;flex-direction:column;gap:10px;">
       ${commits
         .map((c) => {
-          const msg = c.message_first_line || c.message;
-          const isAction = /chore\(rules\)|chore\(image-rule\)|chore\(rule-action\)|chore: manual regenerate/.test(msg);
-          const isFeat = /^feat:/.test(msg);
-          const isFix = /^fix(\(|:)/.test(msg);
-          const isAutoRegen = /chore: auto-regenerate/.test(msg);
-          const iconClass = isFix ? 'error' : isFeat ? 'success' : isAction ? 'info' : 'muted';
-          const icon = isFix ? '✕' : isFeat ? '+' : isAction ? '✎' : isAutoRegen ? '⟳' : '·';
+          const h = humanizeCommitMessage(c.message_first_line || c.message, c.author);
+          const ic = iconFor(h.kind);
+          const whoDisplay = h.who === 'system' ? 'automatycznie' : (h.who === 'Ty' ? 'przez Ciebie' : 'przez ' + escapeHTML(h.who));
           return `
         <div class="decision-card" style="margin-bottom:0;">
-          <div class="decision-icon ${iconClass}">${icon}</div>
+          <div class="decision-icon ${ic.c}">${ic.i}</div>
           <div class="decision-body">
-            <div class="decision-title">${escapeHTML(msg)}</div>
+            <div class="decision-title">${escapeHTML(h.title)}</div>
             <div class="decision-meta">
-              <span class="mono">${escapeHTML(c.short_sha)}</span> · ${escapeHTML(c.author)} · ${fmtRelative(c.timestamp)} (${fmtDate(c.timestamp)})
-              · <a href="${escapeHTML(c.html_url)}" target="_blank" rel="noopener" class="mono">view commit →</a>
+              ${whoDisplay} · ${fmtRelative(c.timestamp)} (${fmtDate(c.timestamp)})${h.note ? ' · <em>' + escapeHTML(h.note) + '</em>' : ''}
             </div>
           </div>
         </div>
@@ -952,17 +1014,34 @@ async function renderHypotheses() {
 function buildHypotheses(rules, snapshot) {
   const out = [];
 
-  // Najpilniejsze: A/B test nie zbiera danych
+  // Najpilniejsze: A/B test nie zbiera danych (z FULL diagnozą + 1-click fix)
   if (snapshot?.duplicate_diagnosis?.status === 'critical') {
     const d = snapshot.duplicate_diagnosis;
+    const fix = d.fix_proposal || {};
+    const detail = fix.preserves
+      ? `<strong>Dlaczego tak się dzieje:</strong><br>${(d.evidence || []).slice(0,2).map((e) => '• ' + escapeHTML(e)).join('<br>')}<br><br><strong>Jak to naprawić:</strong> ${escapeHTML(fix.name || '')}.<br>${escapeHTML(fix.preserves || '')}<br><br><strong>Czego się spodziewać:</strong> ${escapeHTML(fix.expected_outcome_week1 || '')}`
+      : `<strong>Dlaczego tak się dzieje:</strong> ${escapeHTML(d.evidence?.[0] || '—')}`;
     out.push({
       priority: 'critical',
       icon: '!',
-      title: 'Twój test tytułów od miesięcy nie zbiera danych',
-      source: 'Z danych z Twoich kampanii Google Ads, ostatni miesiąc',
-      detail: `<strong>Dlaczego tak się dzieje:</strong> ${escapeHTML(d.likely_root_causes?.[0]?.title || '—')}<br>${escapeHTML(d.likely_root_causes?.[0]?.detail || '')}`,
-      action: (d.recommended_actions || []).map(escapeHTML).join('<br><br>'),
+      title: d.headline || 'Twój test tytułów nie zbiera danych',
+      source: 'Confirmed przez analizę Twoich kampanii (custom_label_8 ad-group filters)',
+      detail,
+      action: fix.caveat_t6_t7 ? `Powiedz mi „naprawiaj" — przygotowałem już pre-flight diff. <br><br><em>Uwaga: ${escapeHTML(fix.caveat_t6_t7)}</em>` : 'Powiedz mi „naprawiaj" — pre-flight diff gotowy.',
       evidence: d.evidence,
+    });
+  }
+
+  // PROPOSED NEW TESTS — 8 konkretnych propozycji z evidence
+  for (const t of (snapshot?.proposed_new_tests || []).slice(0, 5)) {
+    const priority = t.priority_score >= 9 ? 'high' : t.priority_score >= 7 ? 'medium' : 'low';
+    out.push({
+      priority,
+      icon: '+',
+      title: `Spróbuj: „${escapeHTML(t.title_proposed)}"`,
+      source: `Z danych GSC + Google Ads + GA4 · grupa „${escapeHTML(t.match_group)}" · ${t.products_in_scope} produktów`,
+      detail: escapeHTML(t.evidence),
+      action: `Spodziewany wpływ: <strong>+${t.expected_revenue_pln_per_month?.toLocaleString('pl-PL')} zł/mc przychodu</strong>${t.campaign_target ? ` · wpadnie do: ${escapeHTML(t.campaign_target)}` : ''}<br><br>Powiedz mi numer reguły (np. „t9") i sufix, a dodam test do config.`,
     });
   }
 
@@ -1056,27 +1135,32 @@ async function renderPerformance() {
 
   subtitle.innerHTML = `Liczby z Twojego konta Google Ads, sprawdzone <em>${escapeHTML((s.captured_at || '').substring(0, 16).replace('T', ' '))}</em>`;
 
-  // Critical diagnosis banner
+  // Critical diagnosis banner — z confirmed root cause + 1-click fix CTA
   if (s.duplicate_diagnosis && s.duplicate_diagnosis.status === 'critical') {
-    const probLabel = (p) => p === 'high' ? 'najprawdopodobniej' : 'możliwe';
+    const d = s.duplicate_diagnosis;
+    const fix = d.fix_proposal || {};
     banner.innerHTML = `
-      <div class="alert error show" style="font-size:14.5px;line-height:1.6;">
-        <strong style="font-size:16px;">Twój test tytułów nie zbiera danych</strong>
-        <div style="margin-top:10px;color:inherit;">${escapeHTML(s.duplicate_diagnosis.headline)}</div>
-        <div style="margin-top:14px;"><strong>Skąd to wiem:</strong></div>
-        <ul style="margin:6px 0 12px 22px;font-size:13px;">
-          ${(s.duplicate_diagnosis.evidence || []).map((e) => `<li>${escapeHTML(e)}</li>`).join('')}
+      <div class="alert error show" style="font-size:14.5px;line-height:1.65;">
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:500;margin-bottom:10px;">${escapeHTML(d.headline || 'Twój test tytułów nie zbiera danych')}</div>
+        ${d.root_cause_confirmed ? '<div style="margin-bottom:14px;font-style:italic;opacity:0.85;">Wiem już dokładnie dlaczego — sprawdziłem strukturę Twoich kampanii w Google Ads.</div>' : ''}
+
+        <div style="margin-top:12px;"><strong>Co znalazłem:</strong></div>
+        <ul style="margin:6px 0 14px 22px;font-size:13.5px;">
+          ${(d.evidence || []).map((e) => `<li style="margin-bottom:4px;">${escapeHTML(e)}</li>`).join('')}
         </ul>
-        <div><strong>Dlaczego tak się dzieje (po kolei od najbardziej prawdopodobnej):</strong></div>
-        <ol style="margin:8px 0 0 22px;font-size:13px;">
-          ${(s.duplicate_diagnosis.likely_root_causes || []).map((c) => `
-            <li style="margin-bottom:10px;">
-              <span class="pill pill-${c.probability === 'high' ? 'error' : 'warning'}" style="font-size:10.5px;">${probLabel(c.probability)}</span>
-              <strong>${escapeHTML(c.title)}</strong><br>
-              <span style="opacity:0.88;">${escapeHTML(c.detail)}</span>
-            </li>
-          `).join('')}
-        </ol>
+
+        ${fix.name ? `
+          <div style="margin-top:18px;padding:16px 18px;background:rgba(154,184,150,0.08);border:1px solid rgba(154,184,150,0.25);border-radius:10px;">
+            <div style="color:var(--success);font-family:var(--font-display);font-size:17px;font-weight:500;margin-bottom:8px;">✓ Naprawa gotowa do wdrożenia</div>
+            <div style="font-size:13.5px;line-height:1.65;color:var(--text-dim);">
+              <strong>Co zrobię:</strong> ${escapeHTML(fix.name)}.<br>
+              <strong>Co zachowane:</strong> ${escapeHTML(fix.preserves || '')}.<br>
+              <strong>Czego się spodziewać:</strong> ${escapeHTML(fix.expected_outcome_week1 || '')}.<br>
+              ${fix.caveat_t6_t7 ? `<strong style="color:var(--warning);">Uwaga:</strong> ${escapeHTML(fix.caveat_t6_t7)}<br>` : ''}
+            </div>
+            <div style="margin-top:14px;font-size:13px;color:var(--text);"><strong>Powiedz mi „naprawiaj"</strong> w czacie, a wprowadzę zmianę z pełnym pre-flight diff. Możesz to potem w 30 sek cofnąć (revert commit).</div>
+          </div>
+        ` : ''}
       </div>
     `;
   } else {
