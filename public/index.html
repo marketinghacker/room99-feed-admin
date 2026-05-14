@@ -180,6 +180,76 @@
       </div>
     </section>
 
+    <!-- SIDE-PANEL EDITOR (Rules) -->
+    <div class="side-panel-backdrop" id="side-panel-backdrop"></div>
+    <aside class="side-panel" id="side-panel" aria-hidden="true">
+      <div class="side-panel-header">
+        <div>
+          <div class="card-title" id="sp-rule-id">—</div>
+          <div class="card-sub" id="sp-rule-status">—</div>
+        </div>
+        <button class="btn btn-secondary" id="sp-close" style="padding:6px 12px;">Zamknij</button>
+      </div>
+      <div class="side-panel-body">
+        <div id="sp-impact-banner" style="margin-bottom:16px;"></div>
+
+        <div class="field">
+          <label for="sp-matchInTitle">Grupa produktów (matchInTitle)</label>
+          <input type="text" id="sp-matchInTitle" />
+          <div class="hint">Tekst który MUSI być w tytule produktu żeby reguła zadziałała (case-insensitive)</div>
+        </div>
+
+        <div class="field">
+          <label for="sp-searchInTitle">Szukaj w tytule (searchInTitle)</label>
+          <input type="text" id="sp-searchInTitle" />
+          <div class="hint"><strong>UWAGA:</strong> zmiana tego pola zmieni które tytuły są transformowane — może zerwać statystyki A/B testu</div>
+        </div>
+
+        <div class="field">
+          <label for="sp-replaceWith">Zastąp przez (replaceWith)</label>
+          <input type="text" id="sp-replaceWith" />
+          <div class="hint">Wynikowy tytuł będzie zawsze <strong>Title Case</strong> (każde słowo z dużej). Live preview poniżej.</div>
+          <div id="sp-replace-preview" class="text-dim mono" style="margin-top:6px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;min-height:28px;">—</div>
+        </div>
+
+        <div class="field">
+          <label for="sp-dupSuffix">Sufiks ID (dupSuffix)</label>
+          <input type="text" id="sp-dupSuffix" pattern="[a-z0-9]+" maxlength="10" />
+          <div class="hint"><strong>UWAGA:</strong> zmiana sufiksu zmienia custom_label_1 → utrata historical attribution w Google Ads / GA4. Twórz NEW rule (np. t1_v2) zamiast in-place edit jeśli to A/B test.</div>
+        </div>
+
+        <div class="field">
+          <label for="sp-notes">Notatka</label>
+          <textarea id="sp-notes" rows="2"></textarea>
+        </div>
+
+        <div class="card-header" style="margin-top:24px;margin-bottom:8px;">
+          <div class="card-title" style="font-size:14px;">Validators</div>
+        </div>
+        <div class="validator-list" id="sp-validators">
+          <div class="text-muted" style="font-size:12px;">Edytuj pole żeby zobaczyć walidatory…</div>
+        </div>
+
+        <div class="card-header" style="margin-top:20px;margin-bottom:8px;">
+          <div class="card-title" style="font-size:14px;">Live preview (3 sample products)</div>
+          <span class="text-muted mono" style="font-size:11px;" id="sp-sample-count">—</span>
+        </div>
+        <div id="sp-samples">
+          <div class="text-muted" style="font-size:12px;">Wpisz pola powyżej aby zobaczyć podgląd…</div>
+        </div>
+
+        <details style="margin-top:20px;">
+          <summary class="card-title" style="font-size:13px;cursor:pointer;color:var(--text-dim);">Diff JSON (collapsed)</summary>
+          <pre class="mono" id="sp-diff" style="font-size:11px;background:var(--bg);padding:12px;border-radius:6px;margin-top:8px;overflow-x:auto;max-height:240px;color:var(--text-dim);">—</pre>
+        </details>
+      </div>
+      <div class="side-panel-footer">
+        <button class="btn btn-danger" id="sp-delete">Usuń</button>
+        <button class="btn btn-secondary" id="sp-toggle">Pause/Resume</button>
+        <button class="btn" id="sp-save">Zapisz</button>
+      </div>
+    </aside>
+
     <!-- ADD VARIANT (legacy form, still works) -->
     <section id="section-add-variant" class="section">
       <div class="section-header">

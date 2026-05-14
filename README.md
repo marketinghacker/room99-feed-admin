@@ -313,7 +313,23 @@ Marcin chce więcej funkcji. Najprawdopodobniejsze:
 
 ## 12. AKTUALNY STAN
 
-### Sprint 1 (2026-05-14) — Read-only Command Center
+### Sprint 3 (2026-05-14) — Rule editing + GMC validator + regenerate fallback
+- ✅ `api/rule-impact.js` — POST returns `matched_count`, 3 sample title transformations, validators (title length 30/70/150, CAPS ratio, promo words, search-not-found-in-match, zero-match, rule overlap, dupSuffix duplicate). Mirror of `wordCapitalize()` in generate-feed.js.
+- ✅ `api/rules/[id].js` — PATCH (`action: toggle | set_active | edit`) and DELETE with ETag race-safety + 3× retry on 409. Mutations: validate dupSuffix uniqueness, write `updated_at`, mirror customLabel1 to dupSuffix. Friendly 403 message if PAT scope lacks Contents:R/W.
+- ✅ `api/regenerate-feed.js` — two-tier strategy: tries `workflow_dispatch` first, falls back to `config.json` touch (`_lastTouched` field) which triggers regenerate-feed.yml via push event (paths: config.json). Works with only Contents:R/W scope.
+- ✅ Rules section: clickable rows, inline status toggle pill, live match count badge (parallel /api/rule-impact calls per rule), Edit → button opens side-panel.
+- ✅ Side-panel slide-in (520px from right): editable fields (matchInTitle, searchInTitle, replaceWith, dupSuffix, notes) + impact banner ("N of 1841 products affected") + live validators with severity icons + 3 sample title transformations + collapsed Diff JSON section + footer (Usuń / Pause/Resume / Zapisz). Save disabled when any validator error. Esc + backdrop click + close button all dismiss.
+- ✅ Toast system (Linear pattern, bottom-right, 5s auto-dismiss) for action confirmations.
+- ✅ Warning hints on `searchInTitle` and `dupSuffix` fields per Google Ads expert recommendation (changing these resets A/B stats cohort — suggest `_v2` rule pattern instead).
+
+### Sprint 2 (2026-05-14) — Manual regenerate trigger + Image Manager browser + CAPS live preview
+- ✅ `api/regenerate-feed.js` — POST workflow_dispatch on regenerate-feed.yml
+- ✅ `api/products.js` — paginated FO source feed products with image arrays (5min cache)
+- ✅ Feed Health: ⟳ Regenerate now button + friendly error if PAT scope insufficient
+- ✅ Image Manager (browse-only): 1841 products grid, search, click → per-product gallery with MAIN badge + numbered tiles, click non-main → BEFORE/AFTER swap preview + generated imageRule JSON (Apply disabled — write awaits pre-flight diff infra)
+- ✅ Add Variant: live Title Case preview (warning color if input ≠ normalized output)
+
+### Sprint 1 (2026-05-14) — Read-only Command Center foundation
 - ✅ SPA shell z 7-sekcyjnym hash routerem (Today, Rules, Hypotheses, Images, Performance, Feed Health, History) + legacy "+ Add Variant"
 - ✅ `public/index.html` — SPA HTML
 - ✅ `public/styles.css` — dark theme, command-center aesthetic
@@ -322,7 +338,7 @@ Marcin chce więcej funkcji. Najprawdopodobniejsze:
 - ✅ `api/feed-stats.js` — GET /api/feed-stats (output size, last cron run, last commit)
 - ✅ `api/add-variant.js` — unchanged, legacy POST endpoint still works (Issue-based flow)
 - ✅ Today section: 4 KPI tiles (active rules, duplicates count, last regeneration, last config change) + decisions feed + feed activity
-- ✅ Rules section: read-only table of all rules with status pills, edit button disabled (Sprint 2)
+- ✅ Rules section: read-only table of all rules with status pills
 - ✅ Feed Health section: cron status, output stats, last commit
 - ✅ Hypotheses/Images/Performance/History: placeholders with "Coming in Sprint X" messaging
 - ✅ Graceful degradation if API endpoints fail (error alerts in UI)

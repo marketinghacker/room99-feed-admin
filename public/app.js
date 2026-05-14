@@ -216,6 +216,8 @@ async function renderToday() {
 
 async function renderRules() {
   await ensureCoreLoaded();
+  // Re-fetch latest config on each render so toggles/edits stay fresh
+  await reloadConfig();
 
   const linkEl = document.getElementById('rules-source-link');
   linkEl.href = CONFIG_URL;
@@ -230,7 +232,7 @@ async function renderRules() {
   const rules = state.config?.duplicateRules || [];
   const active = rules.filter((r) => r.active).length;
   document.getElementById('rules-count').textContent =
-    `${rules.length} reguł · ${active} aktywnych · ${rules.length - active} nieaktywnych`;
+    `${rules.length} reguł · ${active} aktywnych · ${rules.length - active} nieaktywnych · klik wiersz aby edytować`;
 
   if (rules.length === 0) {
     document.getElementById('rules-table-wrap').innerHTML =
@@ -241,17 +243,24 @@ async function renderRules() {
   const rows = rules
     .map(
       (r) => `
-    <tr>
+    <tr class="rules-row" data-rule-id="${escapeHTML(r.id)}">
       <td class="mono"><strong>${escapeHTML(r.dupSuffix || '—')}</strong></td>
       <td><span class="pill pill-muted">${escapeHTML(r.matchInTitle || '—')}</span></td>
       <td>
         <div class="text-dim mono" style="font-size:11px;">${escapeHTML(r.searchInTitle || '')}</div>
         <div style="font-weight:500;">${escapeHTML(r.replaceWith || '')}</div>
       </td>
-      <td>${r.active ? '<span class="pill pill-success">active</span>' : '<span class="pill pill-muted">inactive</span>'}</td>
+      <td>
+        <span class="pill match-count-badge pill-info" data-mc-rule="${escapeHTML(r.id)}" title="Loading…">…</span>
+      </td>
+      <td>
+        <button class="pill status-toggle ${r.active ? 'pill-success' : 'pill-muted'}" data-toggle-rule="${escapeHTML(r.id)}" data-current="${r.active ? 'true' : 'false'}" title="Klik aby ${r.active ? 'wyłączyć' : 'włączyć'}">
+          ${r.active ? 'active' : 'inactive'}
+        </button>
+      </td>
       <td class="text-muted" style="font-size:12px;">${escapeHTML(r.notes || '')}</td>
       <td>
-        <button class="pill pill-muted" disabled title="Sprint 2 — Coming next" style="border:none;cursor:not-allowed;">Edit</button>
+        <button class="pill pill-info edit-rule-btn" data-edit-rule="${escapeHTML(r.id)}" style="border:none;cursor:pointer;">Edit →</button>
       </td>
     </tr>
   `
@@ -265,6 +274,7 @@ async function renderRules() {
           <th>Suffix</th>
           <th>Group</th>
           <th>Search → Replace</th>
+          <th>Match #</th>
           <th>Status</th>
           <th>Notes</th>
           <th>Actions</th>
@@ -273,6 +283,361 @@ async function renderRules() {
       <tbody>${rows}</tbody>
     </table>
   `;
+
+  // Wire click handlers
+  document.querySelectorAll('.edit-rule-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSidePanelEditor(btn.dataset.editRule);
+    });
+  });
+  document.querySelectorAll('.rules-row').forEach((row) => {
+    row.addEventListener('click', () => openSidePanelEditor(row.dataset.ruleId));
+  });
+  document.querySelectorAll('.status-toggle').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const ruleId = btn.dataset.toggleRule;
+      const currentActive = btn.dataset.current === 'true';
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const r = await fetch('/api/rules/' + encodeURIComponent(ruleId), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'toggle' }),
+        });
+        const j = await r.json();
+        if (r.ok) {
+          showToast(`✓ ${ruleId} → ${currentActive ? 'inactive' : 'active'} — feed regeneruje się w ≤1h`, 'success');
+          await reloadConfig();
+          renderRules();
+        } else {
+          showToast('Błąd: ' + (j.error || 'unknown'), 'error');
+          btn.disabled = false;
+          btn.textContent = currentActive ? 'active' : 'inactive';
+        }
+      } catch (err) {
+        showToast('Błąd sieci: ' + err.message, 'error');
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // Fire match-count fetches in parallel (lightweight — server caches FO feed)
+  rules.forEach((r) => {
+    fetch('/api/rule-impact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matchInTitle: r.matchInTitle }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const el = document.querySelector(`[data-mc-rule="${CSS.escape(r.id)}"]`);
+        if (el && data.matched_count !== undefined) {
+          el.textContent = data.matched_count.toString();
+          el.title = `${data.matched_count} produktów matchuje "${r.matchInTitle}" w aktywnym feedzie`;
+          if (data.matched_count === 0) el.className = 'pill match-count-badge pill-warning';
+        }
+      })
+      .catch(() => {
+        const el = document.querySelector(`[data-mc-rule="${CSS.escape(r.id)}"]`);
+        if (el) {
+          el.textContent = '—';
+          el.className = 'pill match-count-badge pill-muted';
+        }
+      });
+  });
+}
+
+async function reloadConfig() {
+  try {
+    const data = await fetchJSON('/api/config');
+    state.config = data.config;
+    state.configSha = data.sha;
+    state.configError = null;
+  } catch (e) {
+    state.configError = e.message;
+  }
+}
+
+// ---------- TOAST ----------
+function showToast(message, type) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px;';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = 'alert show ' + (type || 'success');
+  toast.style.cssText = 'min-width:280px;max-width:420px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+  toast.innerHTML = message;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 4500);
+  setTimeout(() => toast.remove(), 5000);
+}
+
+// ---------- SIDE-PANEL EDITOR ----------
+const sp = {
+  current: null,
+  debounceTimer: null,
+};
+
+function openSidePanelEditor(ruleId) {
+  const rules = state.config?.duplicateRules || [];
+  const rule = rules.find((r) => r.id === ruleId);
+  if (!rule) {
+    showToast('Reguła nie znaleziona', 'error');
+    return;
+  }
+  sp.current = JSON.parse(JSON.stringify(rule)); // working copy
+  sp.original = JSON.parse(JSON.stringify(rule));
+
+  document.getElementById('sp-rule-id').textContent = rule.id;
+  document.getElementById('sp-rule-status').innerHTML =
+    `<span class="mono">${escapeHTML(rule.dupSuffix || '')}</span> · ${rule.active
+      ? '<span class="pill pill-success">active</span>'
+      : '<span class="pill pill-muted">inactive</span>'} · created ${escapeHTML((rule.created_at || '').substring(0, 10) || '—')}${rule.updated_at ? ' · last edit ' + escapeHTML(rule.updated_at.substring(0, 10)) : ''}`;
+
+  ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes'].forEach((field) => {
+    document.getElementById('sp-' + field).value = rule[field] || '';
+  });
+
+  document.getElementById('side-panel').classList.add('show');
+  document.getElementById('side-panel-backdrop').classList.add('show');
+  document.getElementById('side-panel').setAttribute('aria-hidden', 'false');
+
+  bindSidePanelHandlers();
+  runImpactCheck();
+}
+
+function closeSidePanel() {
+  document.getElementById('side-panel').classList.remove('show');
+  document.getElementById('side-panel-backdrop').classList.remove('show');
+  document.getElementById('side-panel').setAttribute('aria-hidden', 'true');
+  sp.current = null;
+  sp.original = null;
+}
+
+let _sidePanelBound = false;
+function bindSidePanelHandlers() {
+  if (_sidePanelBound) return;
+  _sidePanelBound = true;
+
+  document.getElementById('sp-close').addEventListener('click', closeSidePanel);
+  document.getElementById('side-panel-backdrop').addEventListener('click', closeSidePanel);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('side-panel').classList.contains('show')) closeSidePanel();
+  });
+
+  // Field change → update working copy + debounce impact check + update preview
+  ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes'].forEach((field) => {
+    document.getElementById('sp-' + field).addEventListener('input', (e) => {
+      if (!sp.current) return;
+      sp.current[field] = e.target.value;
+      updateReplacePreview();
+      updateDiff();
+      if (['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix'].includes(field)) {
+        clearTimeout(sp.debounceTimer);
+        sp.debounceTimer = setTimeout(runImpactCheck, 350);
+      }
+    });
+  });
+
+  document.getElementById('sp-save').addEventListener('click', saveSidePanelChanges);
+  document.getElementById('sp-toggle').addEventListener('click', toggleSidePanelRule);
+  document.getElementById('sp-delete').addEventListener('click', deleteSidePanelRule);
+}
+
+function updateReplacePreview() {
+  const raw = (sp.current.replaceWith || '').trim();
+  const el = document.getElementById('sp-replace-preview');
+  if (!raw) { el.textContent = '—'; el.style.color = 'var(--muted)'; return; }
+  const normalized = wordCapitalize(raw);
+  el.textContent = normalized;
+  el.style.color = raw === normalized ? 'var(--success)' : 'var(--warning)';
+}
+
+function updateDiff() {
+  const orig = sp.original;
+  const cur = sp.current;
+  const fields = ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes'];
+  const diff = {};
+  for (const f of fields) {
+    if ((orig[f] || '') !== (cur[f] || '')) {
+      diff[f] = { before: orig[f] || '', after: cur[f] || '' };
+    }
+  }
+  document.getElementById('sp-diff').textContent =
+    Object.keys(diff).length === 0 ? 'No changes yet' : JSON.stringify(diff, null, 2);
+}
+
+async function runImpactCheck() {
+  if (!sp.current) return;
+  const otherRules = (state.config?.duplicateRules || []).filter((r) => r.id !== sp.current.id);
+  let data;
+  try {
+    data = await fetch('/api/rule-impact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchInTitle: sp.current.matchInTitle,
+        searchInTitle: sp.current.searchInTitle,
+        replaceWith: sp.current.replaceWith,
+        dupSuffix: sp.current.dupSuffix,
+        ruleId: sp.current.id,
+        otherRules,
+      }),
+    }).then((r) => r.json());
+  } catch (e) {
+    document.getElementById('sp-impact-banner').innerHTML =
+      `<div class="alert error show">Błąd impact check: ${escapeHTML(e.message)}</div>`;
+    return;
+  }
+
+  if (data.error) {
+    document.getElementById('sp-impact-banner').innerHTML =
+      `<div class="alert error show">${escapeHTML(data.error)}</div>`;
+    return;
+  }
+
+  // Banner
+  const errorsCount = (data.validators || []).filter((v) => v.level === 'error').length;
+  const bannerLevel = errorsCount > 0 ? 'error' : (data.matched_count === 0 ? 'warning' : 'success');
+  document.getElementById('sp-impact-banner').innerHTML = `
+    <div class="alert show ${bannerLevel}">
+      <strong>${data.matched_count}</strong> z ${data.total_products} produktów dotkniętych regułą.
+      ${errorsCount > 0 ? ` <strong>${errorsCount} blokujący błąd${errorsCount > 1 ? 'y' : ''}</strong> w walidatorach poniżej.` : ''}
+    </div>
+  `;
+
+  // Validators
+  const vl = document.getElementById('sp-validators');
+  if (!data.validators || data.validators.length === 0) {
+    vl.innerHTML = '<div class="text-muted" style="font-size:12px;">Wszystko OK — żadnych ostrzeżeń</div>';
+  } else {
+    vl.innerHTML = data.validators
+      .map(
+        (v) => `
+      <div class="validator-item ${escapeHTML(v.level)}">
+        <span class="vmark">${v.level === 'error' ? '✕' : v.level === 'warning' ? '⚠' : 'ⓘ'}</span>
+        <span>${escapeHTML(v.message)}</span>
+      </div>
+    `
+      )
+      .join('');
+  }
+
+  // Samples
+  const sc = document.getElementById('sp-sample-count');
+  sc.textContent = `pokazuję ${data.samples?.length || 0} z ${data.matched_count}`;
+  const sa = document.getElementById('sp-samples');
+  if (!data.samples || data.samples.length === 0) {
+    sa.innerHTML = '<div class="text-muted" style="font-size:12px;">Brak matched products</div>';
+  } else {
+    sa.innerHTML = data.samples
+      .map(
+        (s) => `
+      <div class="sample-preview">
+        <div class="sample-id">id ${escapeHTML(s.id)}</div>
+        <div class="sample-before">${escapeHTML(s.before)}</div>
+        <div class="sample-after">→ ${escapeHTML(s.after)}</div>
+      </div>
+    `
+      )
+      .join('');
+  }
+
+  // Disable save if any error
+  document.getElementById('sp-save').disabled = errorsCount > 0;
+  document.getElementById('sp-save').title = errorsCount > 0 ? 'Resolve errors first' : '';
+}
+
+async function saveSidePanelChanges() {
+  if (!sp.current) return;
+  const id = sp.original.id;
+  const changes = {};
+  for (const f of ['matchInTitle', 'searchInTitle', 'replaceWith', 'dupSuffix', 'notes']) {
+    if ((sp.original[f] || '') !== (sp.current[f] || '')) {
+      changes[f] = sp.current[f];
+    }
+  }
+  if (Object.keys(changes).length === 0) {
+    showToast('Brak zmian do zapisania', 'warning');
+    return;
+  }
+  const btn = document.getElementById('sp-save');
+  btn.disabled = true;
+  btn.textContent = 'Zapisuję…';
+  try {
+    const r = await fetch('/api/rules/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'edit', changes }),
+    });
+    const j = await r.json();
+    if (r.ok) {
+      showToast(`✓ Reguła ${id} zapisana — feed regeneruje się w ≤1h. <a class="mono" href="${escapeHTML(j.commit_url || '#')}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">view commit →</a>`, 'success');
+      closeSidePanel();
+      await reloadConfig();
+      renderRules();
+    } else {
+      showToast('Błąd: ' + (j.error || 'unknown'), 'error');
+      btn.disabled = false;
+      btn.textContent = 'Zapisz';
+    }
+  } catch (e) {
+    showToast('Błąd sieci: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Zapisz';
+  }
+}
+
+async function toggleSidePanelRule() {
+  if (!sp.original) return;
+  const id = sp.original.id;
+  try {
+    const r = await fetch('/api/rules/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle' }),
+    });
+    const j = await r.json();
+    if (r.ok) {
+      showToast(`✓ ${id} toggled — feed regeneruje się w ≤1h`, 'success');
+      closeSidePanel();
+      await reloadConfig();
+      renderRules();
+    } else {
+      showToast('Błąd: ' + (j.error || 'unknown'), 'error');
+    }
+  } catch (e) {
+    showToast('Błąd sieci: ' + e.message, 'error');
+  }
+}
+
+async function deleteSidePanelRule() {
+  if (!sp.original) return;
+  const id = sp.original.id;
+  if (!confirm(`Usunąć regułę "${id}"? Tego nie można cofnąć inline — tylko git revert.`)) return;
+  try {
+    const r = await fetch('/api/rules/' + encodeURIComponent(id), {
+      method: 'DELETE',
+    });
+    const j = await r.json();
+    if (r.ok) {
+      showToast(`✓ Reguła ${id} usunięta — feed regeneruje się w ≤1h. <a class="mono" href="${escapeHTML(j.commit_url || '#')}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">view commit →</a>`, 'success');
+      closeSidePanel();
+      await reloadConfig();
+      renderRules();
+    } else {
+      showToast('Błąd: ' + (j.error || 'unknown'), 'error');
+    }
+  } catch (e) {
+    showToast('Błąd sieci: ' + e.message, 'error');
+  }
 }
 
 async function renderFeedHealth() {
